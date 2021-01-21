@@ -1,8 +1,19 @@
+import logging
 import json
 import os
 import taglib
 from smrtypntz.database import db
 # import spotipy
+import sys
+
+
+# Init logger
+logging.basicConfig(
+    stream=sys.stderr,
+    level=logging.DEBUG,
+    format="%(asctime)-15s %(levelname)s - %(filename)s:%(funcName)s:%(lineno)s\n  %(message)s"
+)
+logger = logging.getLogger()
 
 
 # Init database

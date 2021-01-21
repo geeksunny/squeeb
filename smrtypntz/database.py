@@ -1,9 +1,12 @@
 from __future__ import annotations
 from contextlib import closing
 from enum import Enum
+import logging
 import sqlite3
 import string
 from typing import Any, Dict, List, Tuple, Union
+
+logger = logging.getLogger()
 
 
 class _Condition(object):
@@ -62,7 +65,7 @@ class _Query(object):
         raise NotImplementedError()
 
     def _get_columns_str(self):
-        return ", ".join(self._value_map.keys()) if self._value_map is not None else ""
+        return ", ".join(self._value_map.keys()) if self._value_map is not None else "*"
 
     def _get_values_str(self):
         return ", ".join("?"*len(self._value_map)) if self._value_map is not None else ""
@@ -224,35 +227,56 @@ class _DbHandler(object):
     def __del__(self):
         self.close()
 
-    def _exec_query_no_result(self, query) -> bool:
+    def _exec_raw_query_no_result(self, query_str: str, args = None) -> bool:
         try:
             with closing(self._conn.cursor()) as c:
-                c.execute(query)
+                c.execute(query_str, args)
                 return True
         except sqlite3.Error as e:
-            print(e)
+            logger.error(e)
             return False
 
-    def _exec_query_single_result(self, query) -> sqlite3.Row:
+    def _exec_raw_query_single_result(self, query_str: str, args = None) -> sqlite3.Row:
         try:
             with closing(self._conn.cursor()) as c:
-                c.execute(query)
+                c.execute(query_str, args)
                 return c.fetchone()
         except sqlite3.Error as e:
-            print(e)
-            return sqlite3.Row()
+            logger.error(e)
+            return None
 
-    def _exec_query_all_results(self, query) -> list:
+    def _exec_raw_query_all_results(self, query_str: str, args: Tuple[Any] = None) -> Union[List[sqlite3.Row], None]:
         try:
             with closing(self._conn.cursor()) as c:
-                c.execute(query)
+                c.execute(query_str, args)
                 return c.fetchall()
         except sqlite3.Error as e:
-            print(e)
-            return []
+            logger.error(e)
+            return None
 
-    def _table_exists(self, table_name) -> sqlite3.Row:
-        return self._exec_query_single_result(
+    def _exec_query_no_result(self, query_obj) -> bool:
+        query = query_obj.build()
+        if 'error' in query:
+            logger.error('QUERY BUILD ERROR: %s', query['error'])
+            return False
+        return self._exec_raw_query_no_result(query['query'], query['args'])
+
+    def _exec_query_single_result(self, query_obj) -> Union[sqlite3.Row, None]:
+        query = query_obj.build()
+        if 'error' in query:
+            logger.error('QUERY BUILD ERROR: %s', query['error'])
+            return None
+        return self._exec_raw_query_single_result(query['query'], query['args'])
+
+    def _exec_query_all_results(self, query_obj) -> Union[List[sqlite3.Row], None]:
+        query = query_obj.build()
+        if 'error' in query:
+            logger.error('QUERY BUILD ERROR: %s', query['error'])
+            return None
+        return self._exec_query_raw_all_results(query['query'], query['args'])
+
+    def _table_exists(self, table_name) -> bool:
+        return self._exec_raw_query_single_result(
             "SELECT * FROM sqlite_master WHERE type='table' AND name='%s'" % table_name)[0] == 1
 
     def close(self) -> None:
@@ -279,16 +303,16 @@ class _MusicDb(_DbHandler):
         return success
 
     def _create_table_artists(self) -> bool:
-        return self._exec_query_no_result('''CREATE TABLE "artists" (
+        return self._exec_raw_query_no_result('''CREATE TABLE "artists" (
                 "id" INTEGER PRIMARY KEY AUTOINCREMENT UNIQUE,
                 "spotify_id" TEXT,
                 "name" TEXT,
                 "spotify_genres" TEXT,
                 "spotify_popularity" INTEGER
-            )''') and self._exec_query_no_result('''CREATE UNIQUE INDEX "artist_names" ON "artists" ("name");''')
+            )''') and self._exec_raw_query_no_result('''CREATE UNIQUE INDEX "artist_names" ON "artists" ("name");''')
 
     def _create_table_albums(self) -> bool:
-        return self._exec_query_no_result('''CREATE TABLE "albums" (
+        return self._exec_raw_query_no_result('''CREATE TABLE "albums" (
                     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
                     "spotify_id" TEXT,
                     "name" TEXT,
@@ -296,11 +320,11 @@ class _MusicDb(_DbHandler):
                     "genres" TEXT,
                     "artist_id" INTEGER REFERENCES "artists"("id"),
                     "spotify_genres" TEXT
-                )''') and self._exec_query_no_result('''CREATE UNIQUE INDEX "artist-name-year"
+                )''') and self._exec_raw_query_no_result('''CREATE UNIQUE INDEX "artist-name-year"
                                                   ON "albums" ("name","year","artist_id");''')
 
     def _create_table_tracks(self) -> bool:
-        return self._exec_query_no_result('''CREATE TABLE "tracks" (
+        return self._exec_raw_query_no_result('''CREATE TABLE "tracks" (
                 "id" INTEGER PRIMARY KEY AUTOINCREMENT,
                 "spotify_id" TEXT,
                 "filepath" TEXT,
