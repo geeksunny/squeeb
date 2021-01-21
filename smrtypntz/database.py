@@ -3,7 +3,7 @@ from contextlib import closing
 from enum import Enum
 import sqlite3
 import string
-from typing import Any, Union
+from typing import Any, Dict, List, Tuple, Union
 
 
 class _Condition(object):
@@ -46,12 +46,12 @@ class _ConditionGroup(list):
 class _Query(object):
 
     _table_name: str = None
-    _value_map: dict = None
+    _value_map: Dict[str, Any] = None
     _where_map: Union[_Condition, _ConditionGroup] = None
 
     def __init__(self,
                  table_name: str,
-                 value_map: dict = None,
+                 value_map: Dict[str, Any] = None,
                  where_map: Union[_Condition, _ConditionGroup] = None) -> None:
         super().__init__()
         self._table_name = table_name
@@ -73,7 +73,7 @@ class _Query(object):
     def _get_args(self) -> tuple:
         return tuple(self._value_map.values()) if self._value_map is not None else None
 
-    def build(self) -> dict:
+    def build(self) -> Dict[String, Any]:
         return {"query": self._get_query_str(), "args": self._get_args()} if self._table_name is not None\
             else {"error": "No table name provided."}
 
