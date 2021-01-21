@@ -1,0 +1,2 @@
+pytaglib~=1.4.6
+spotipy~=2.16.1
