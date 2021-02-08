@@ -2,7 +2,7 @@ from __future__ import annotations
 import string
 from collections import namedtuple
 from enum import Enum
-from typing import Any, Dict, Union, Iterable
+from typing import Any, Dict, Union, Iterable, List
 
 
 Query = namedtuple('Query', ['query', 'args', 'error'])
@@ -28,7 +28,7 @@ class Operator(_StrEnum):
     LIKE = 'LIKE'
     GLOB = 'GLOB'
     IN = 'IN'
-    NOT_IN = 'NOT IN|(%s)'  # or just str(tuple) if type(_value) is tuple
+    NOT_IN = 'NOT IN'
 
 
 class Junction(_StrEnum):
@@ -36,7 +36,17 @@ class Junction(_StrEnum):
     OR = " OR "
 
 
-class _ICondition(object):
+class _QueryValueHandlerMixin(object):
+
+    def _get_values(self) -> Iterable[Any]:
+        raise NotImplementedError()
+
+    @property
+    def values(self) -> Iterable[Any]:
+        return self._get_values()
+
+
+class _ICondition(_QueryValueHandlerMixin):
 
     def __str__(self) -> str:
         raise NotImplementedError()
@@ -56,7 +66,7 @@ class _IJuncture(object):
 class _BaseCondition(_ICondition):
 
     _column_name: str = None
-    _value: Any = None
+    _value: Union[Any, List[Any]] = None
     _operator: Operator = Operator.EQUALS
 
     def __init__(self, column_name_or_condition: Union[str, _BaseCondition] = None,
@@ -71,12 +81,16 @@ class _BaseCondition(_ICondition):
             self._value = value
             self._operator = operator
 
+    def _get_values(self) -> Iterable[Any]:
+        return self._value if isinstance(self._value, list) else [self._value]
+
     def __str__(self) -> str:
-        # TODO: Check for tuple here for proper preparation
-        # TODO: values should be ? arguments. Need to refactor how this works...
-        return '%s %s %s' % (self._column_name, self._operator.value, self._value)\
-            if self._column_name is not None and self._value is not None\
-            else ''
+        if self._column_name is None or self._value is None:
+            return ''
+        value = "(%s)" % ", ".join("?" * len(self._value)) \
+            if self._operator in (Operator.IN, Operator.NOT_IN) and isinstance(self._value, list) \
+            else "?"
+        return '%s %s %s' % (self._column_name, self._operator.value, value)
 
 
 class _MutableConditionMixin(object):
@@ -105,13 +119,13 @@ class _MutableConditionMixin(object):
     def like(self, value_template):
         return self._set_condition(Operator.LIKE, value_template)
 
-    def is_in(self, values):
-        # TODO: Ensure values is tuple/list ?
-        return self._set_condition(Operator.IN, values)
+    def is_in(self, *values):
+        v = values[0] if isinstance(values[0], (list, set, tuple)) else values
+        return self._set_condition(Operator.IN, v)
 
-    def is_not_in(self, values):
-        # TODO: Ensure values is tuple/list ?
-        return self._set_condition(Operator.NOT_IN, values)
+    def is_not_in(self, *values):
+        v = values[0] if isinstance(values[0], (list, set, tuple)) else values
+        return self._set_condition(Operator.NOT_IN, v)
 
 
 class Condition(_BaseCondition, _IJuncture):
@@ -128,14 +142,18 @@ class Condition(_BaseCondition, _IJuncture):
 class MutableCondition(_BaseCondition, _MutableConditionMixin):
 
     def _set_condition(self, operator, value) -> Condition:
-        self._value = value
+        if isinstance(value, (list, set, tuple)):
+            self._value = []
+            self._value.extend(value)
+        else:
+            self._value = value
         self._operator = operator
         return Condition(self)
 
 
 class _ConditionSequence(_ICondition):
 
-    _conditions = []
+    _conditions: List[Union[_ICondition, Junction]] = []
 
     def __init__(self, first_condition_or_sequence: Union[_ICondition, _ConditionSequence],
                  first_junction: Junction = None) -> None:
@@ -162,6 +180,13 @@ class _ConditionSequence(_ICondition):
             # todo: raise error
             pass
         return MutableConditionSequence(self)
+
+    def _get_values(self) -> Iterable[Any]:
+        values = []
+        for condition in self._conditions:
+            if isinstance(condition, _ICondition):
+                values.extend(condition._get_values())
+        return values
 
     def __str__(self) -> str:
         return "".join(map(str, self._conditions)) if not self.is_ready_for_condition() else ""
@@ -197,18 +222,24 @@ class MutableConditionSequence(_ConditionSequence, _MutableConditionMixin):
         return ConditionSequence(self)
 
 
-class _ConditionGroup(list, _ICondition, _IJuncture):
+class ConditionGroup(list, _ICondition, _IJuncture):
 
-    _conditions = []
-    _group_junction = None
+    _conditions: List[_ICondition] = []
+    _group_junction: Junction = None
 
     def __init__(self, group_junction: Junction, conditions: Iterable[_ICondition]) -> None:
         super().__init__()
         self._group_junction = group_junction
         self._conditions.extend(conditions)
 
+    def _get_values(self) -> Iterable[Any]:
+        values = []
+        for condition in self._conditions:
+            values.extend(condition._get_values())
+        return values
+
     def __str__(self) -> str:
-        return '(%s)' % (self._group_junction.value.join(self._conditions))
+        return '(%s)' % (self._group_junction.value.join(map(str, self._conditions)))
 
     def __join(self, junction: Junction):
         if self._group_junction is junction:
@@ -229,16 +260,16 @@ class _QueryBuilder(object):
 
     _table_name: str = None
     _value_map: Dict[str, Any] = None
-    _where_map: Union[Condition, _ConditionGroup] = None
+    _where_conditions: Union[Condition, ConditionSequence, ConditionGroup] = None
 
     def __init__(self,
                  table_name: str,
                  value_map: Dict[str, Any] = None,
-                 where_map: Union[Condition, _ConditionGroup] = None) -> None:
+                 where_condition: Union[Condition, ConditionSequence, ConditionGroup] = None) -> None:
         super().__init__()
         self._table_name = table_name
         self._value_map = value_map
-        self._where_map = where_map
+        self._where_conditions = where_condition
 
     def _get_query_str(self) -> str:
         raise NotImplementedError()
@@ -249,8 +280,11 @@ class _QueryBuilder(object):
     def _get_values_str(self):
         return ", ".join("?"*len(self._value_map)) if self._value_map is not None else ""
 
-    def _get_where_conditions(self) -> str:
-        return 'WHERE %s' % str(self._where_map) if self._where_map is not None else ""
+    def _get_where_str(self) -> str:
+        return 'WHERE %s' % str(self._where_conditions) if self._where_conditions is not None else ""
+
+    def _get_where_args(self) -> List[Any]:
+        return self._where_conditions._get_values() if self._where_conditions is not None else []
 
     def _get_args(self) -> tuple:
         return tuple(self._value_map.values()) if self._value_map is not None else None
@@ -292,7 +326,7 @@ class SelectQuery(_QueryBuilder):
         return tmpl.substitute({
             "columns": self._get_columns_str(),
             "table": self._table_name,
-            "where": self._get_where_conditions() if self._where_map is not None else ""
+            "where": self._get_where_conditions() if self._where_conditions is not None else ""
         }).strip()
 
 
@@ -311,7 +345,7 @@ class UpdateQuery(_QueryBuilder):
         return tmpl.substitute({
             "table": self._table_name,
             "changes": self._get_changes_string(),
-            "where": self._get_where_conditions() if self._where_map is not None else ""
+            "where": self._get_where_conditions() if self._where_conditions is not None else ""
         }).strip()
 
 
@@ -322,7 +356,7 @@ class DeleteQuery(_QueryBuilder):
         return tmpl.substitute({
             "table": self._table_name,
             "where": self._get_where_conditions()
-        }) if self._where_map is not None else ''
+        }) if self._where_conditions is not None else ''
 
 
 def and_group(*args):
