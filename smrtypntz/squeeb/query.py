@@ -328,7 +328,7 @@ class _QueryArgs(Enum):
 class _QueryBuilder(object):
 
     _table_name: str = None
-    _value_map: Union[_QueryValueMap, _QueryValueMapGroup] = _QueryValueMap()
+    _value_map: Union[_QueryValueMap, _QueryValueMapGroup] = None
     _where_conditions: Union[Condition, ConditionSequence, ConditionGroup] = None
 
     def __init__(self,
@@ -338,11 +338,21 @@ class _QueryBuilder(object):
         super().__init__()
         self._table_name = table_name
         if value_map is not None:
+            self._value_map = _QueryValueMap()
             self._value_map.update(value_map)
         self._where_conditions = where_condition
 
     def _get_query_str(self) -> str:
         raise NotImplementedError()
+
+    def _get_args_needed(self) -> Tuple[_QueryArgs]:
+        raise NotImplementedError()
+
+    def _set_value(self, value_obj: Union[Dict, List[Dict]]):
+        if isinstance(value_obj, list):
+            pass
+        else:
+            pass
 
     def _get_columns_str(self) -> str:
         return self._value_map.column_str if self._value_map is not None else "*"
@@ -354,27 +364,27 @@ class _QueryBuilder(object):
         return self._value_map.value_set_str if isinstance(self._value_map, _QueryValueMap) else ""
 
     def _get_where_str(self, prefix: str = 'WHERE') -> str:
-        return ('%s %s' % (prefix, str(self._where_conditions) if self._where_conditions is not None else "")).strip()
+        return ('%s %s' % (prefix, str(self._where_conditions))).strip() if self._where_conditions is not None else ""
 
     def _get_where_args(self) -> List[Any]:
         return self._where_conditions.value_args if self._where_conditions is not None else []
 
-    def _get_args(self, *args: Tuple[_QueryArgs]) -> Tuple[Any]:
+    def _get_args(self, q_args: List[_QueryArgs]) -> Tuple[Any]:
         f_map = {
-            _QueryArgs.VALUE: self._value_map._get_values,
-            _QueryArgs.WHERE: self._where_conditions._get_values if self._where_conditions is not None else list
+            _QueryArgs.VALUE: self._value_map,
+            _QueryArgs.WHERE: self._where_conditions
         }
         query_args = []
-        for arg in args:
+        for arg in q_args:
             if isinstance(arg, _QueryArgs):
-                args_part = f_map[arg]() if arg in f_map else None
+                args_part = f_map[arg].value_args if arg in f_map and f_map[arg] is not None else None
                 if args_part is None or len(args_part) == 0:
                     continue  # Skip
                 query_args.extend(args_part)
         return tuple(query_args)
 
     def build(self) -> Query:
-        return Query(self._get_query_str(), self._get_args()) if self._table_name is not None\
+        return Query(self._get_query_str(), self._get_args(self._get_args_needed())) if self._table_name is not None\
             else Query(error="No table name provided.")
 
 
@@ -394,6 +404,9 @@ class _DropTable(_QueryBuilder):
 
 class InsertQuery(_QueryBuilder):
 
+    def _get_args_needed(self) -> List[_QueryArgs]:
+        return [_QueryArgs.VALUE]
+
     def _get_query_str(self) -> str:
         tmpl = string.Template('INSERT INTO $table $columns VALUES $values')
         return tmpl.substitute({
@@ -404,6 +417,9 @@ class InsertQuery(_QueryBuilder):
 
 
 class SelectQuery(_QueryBuilder):
+
+    def _get_args_needed(self) -> List[_QueryArgs]:
+        return [_QueryArgs.WHERE]
 
     def _get_query_str(self) -> str:
         tmpl = string.Template('SELECT $columns FROM $table $where')
@@ -416,6 +432,9 @@ class SelectQuery(_QueryBuilder):
 
 class UpdateQuery(_QueryBuilder):
 
+    def _get_args_needed(self) -> List[_QueryArgs]:
+        return [_QueryArgs.VALUE, _QueryArgs.WHERE]
+
     def _get_query_str(self) -> str:
         tmpl = string.Template('UPDATE $table SET $changes $where')
         return tmpl.substitute({
@@ -426,6 +445,9 @@ class UpdateQuery(_QueryBuilder):
 
 
 class DeleteQuery(_QueryBuilder):
+
+    def _get_args_needed(self) -> List[_QueryArgs]:
+        return [_QueryArgs.WHERE]
 
     def _get_query_str(self) -> str:
         tmpl = string.Template('DELETE FROM $table $where')
@@ -457,8 +479,3 @@ def where(*args) -> MutableCondition:
     else:
         # Error state?
         pass
-
-
-w = where('col_a').equals(1).and_.where('col_b').greater_than(5).or_.where('col_c').not_equals(2)
-print('\n%s\n' % w)
-print(type(w))
