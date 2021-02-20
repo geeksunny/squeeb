@@ -274,6 +274,10 @@ class ConditionGroup(list, _ICondition, _IJuncture):
 
 class _QueryValueMap(dict, _QueryValueHandlerMixin, _IQueryValueStrings):
 
+    def __init__(self, values: Dict[str, Any]) -> None:
+        super().__init__()
+        self.update(values)
+
     def _get_values(self) -> Iterable[Any]:
         return self.values()
 
@@ -293,6 +297,13 @@ class _QueryValueMap(dict, _QueryValueHandlerMixin, _IQueryValueStrings):
 class _QueryValueMapGroup(_QueryValueHandlerMixin, _IQueryValueStrings):
 
     _value_maps: List[_QueryValueMap] = []
+
+    @staticmethod
+    def create(value_maps: Iterable[Dict[str, Any]]) -> _QueryValueMapGroup:
+        query_value_maps = []
+        for value_map in value_maps:
+            query_value_maps.append(_QueryValueMap(value_map))
+        return _QueryValueMapGroup(query_value_maps)
 
     def __init__(self, query_value_maps: Iterable[_QueryValueMap] = None) -> None:
         for value_map in query_value_maps:
@@ -333,13 +344,12 @@ class _QueryBuilder(object):
 
     def __init__(self,
                  table_name: str,
-                 value_map: Dict[str, Any] = None,
+                 value_map: Union[Dict[str, Any], List[Dict[str, Any]]] = None,
                  where_condition: Union[Condition, ConditionSequence, ConditionGroup] = None) -> None:
         super().__init__()
         self._table_name = table_name
         if value_map is not None:
-            self._value_map = _QueryValueMap()
-            self._value_map.update(value_map)
+            self.set_value(value_map)
         self._where_conditions = where_condition
 
     def _get_query_str(self) -> str:
@@ -348,11 +358,11 @@ class _QueryBuilder(object):
     def _get_args_needed(self) -> Tuple[_QueryArgs]:
         raise NotImplementedError()
 
-    def _set_value(self, value_obj: Union[Dict, List[Dict]]):
+    def set_value(self, value_obj: Union[Dict[str, Any], List[Dict[str, Any]]]):
         if isinstance(value_obj, list):
-            pass
+            self._value_map = _QueryValueMapGroup.create(value_obj)
         else:
-            pass
+            self._value_map = _QueryValueMap(value_obj)
 
     def _get_columns_str(self) -> str:
         return self._value_map.column_str if self._value_map is not None else "*"
