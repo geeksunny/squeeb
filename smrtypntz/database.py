@@ -1,34 +1,12 @@
-from squeeb import AbstractDbHandler
+from __future__ import annotations
+
+import squeeb
 
 
-class _Model(dict):
+class Track(squeeb.AbstractModel):
 
-    def __init__(self, taglib_song=None, sqlite_row=None, sqlite_field_mapping=None) -> None:
-        super().__init__()
-        if taglib_song is not None:
-            self.populate(taglib_song)
-        if sqlite_row is not None:
-            self.from_sqlite(sqlite_row, sqlite_field_mapping)
-
-    def _set_if_tag_exists(self, field_name, source, source_field=None) -> None:
-        if source_field is None:
-            source_field = field_name
-        if source[source_field] is not None:
-            self[field_name] = source[source_field][0] if isinstance(source[source_field], list)\
-                else source[source_field]
-
-    def populate(self, taglib_song) -> None:
-        raise NotImplementedError()
-
-    def from_sqlite(self, row: sqlite3.Row, sqlite_field_mapping=None) -> None:
-        for sql_key in row.keys():
-            key = sqlite_field_mapping[sql_key]\
-                if sqlite_field_mapping is not None and sql_key in sqlite_field_mapping\
-                else sql_key
-            self[key] = row[sql_key]
-
-
-class Track(_Model):
+    def __init__(self) -> None:
+        super().__init__(db, "tracks")
 
     def populate(self, taglib_song) -> None:
         self['filepath'] = taglib_song.path
@@ -49,7 +27,10 @@ class Track(_Model):
             self['album_id'] = album['id']
 
 
-class Artist(_Model):
+class Artist(squeeb.AbstractModel):
+
+    def __init__(self) -> None:
+        super().__init__(db, "artists")
 
     def populate(self, taglib_song) -> None:
         self._set_if_tag_exists('name', taglib_song, 'ARTIST')
@@ -65,7 +46,10 @@ class Artist(_Model):
         return album_artist
 
 
-class Album(_Model):
+class Album(squeeb.AbstractModel):
+
+    def __init__(self) -> None:
+        super().__init__(db, "albums")
 
     def populate(self, taglib_song) -> None:
         # todo: genres field... array of all genres in tracks?
@@ -79,7 +63,7 @@ class Album(_Model):
 
 
 
-class _MusicDb(AbstractDbHandler):
+class _MusicDb(squeeb.AbstractDbHandler):
 
     # todo: crud methods for music data
 
