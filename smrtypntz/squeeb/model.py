@@ -1,9 +1,29 @@
+from __future__ import annotations
+
 import sqlite3
+from collections import namedtuple
+from typing import Type, Dict, Union, Any
 
 from .db import AbstractDbHandler
+from .query import InsertQuery, UpdateQuery, DeleteQuery, SelectQuery
 
 
-class AbstractModel(dict):
+DbOperationResult = namedtuple('DbOperationResult', ['success', 'error'], defaults=(False, None))
+
+
+class _ICrud(object):
+
+    def delete(self) -> DbOperationResult:
+        raise NotImplementedError()
+
+    def refresh(self) -> DbOperationResult:
+        raise NotImplementedError()
+
+    def save(self, update_existing: bool = True) -> DbOperationResult:
+        raise NotImplementedError()
+
+
+class AbstractModel(dict, _ICrud):
 
     _db_handler: AbstractDbHandler = None
     _table_name: str = None
@@ -14,6 +34,10 @@ class AbstractModel(dict):
         model = cls()
         model.update(a_dict)
         return model
+
+    @classmethod
+    def create_group(cls):
+        return ModelList(cls)
 
     def __init__(self, db_handler: AbstractDbHandler, table_name: str, id_col_name: str = "id") -> None:
         super().__init__()
@@ -31,13 +55,17 @@ class AbstractModel(dict):
     def id(self):
         return self[self._id_col_name] if self._id_col_name in self else None
 
-    def delete(self):
+    @property
+    def table_name(self):
+        return self._table_name
+
+    def delete(self) -> DbOperationResult:
         pass
 
-    def refresh(self):
+    def refresh(self) -> DbOperationResult:
         pass
 
-    def save(self):
+    def save(self, update_existing: bool = True) -> DbOperationResult:
         pass
 
     def _set_if_tag_exists(self, field_name, source, source_field=None) -> None:
@@ -56,3 +84,62 @@ class AbstractModel(dict):
                 if sqlite_field_mapping is not None and sql_key in sqlite_field_mapping\
                 else sql_key
             self[key] = row[sql_key]
+
+
+class ModelList(list, _ICrud):
+
+    _model_type: Type[AbstractModel] = None
+    _index: Dict[Union[str, int, None], Any] = None
+
+    def __init__(self, model_type: Type[AbstractModel]) -> None:
+        super().__init__()
+        if not isinstance(model_type, type) or not issubclass(model_type, AbstractModel):
+            raise TypeError("Invalid model type provided.")
+        self._model_type = model_type
+
+    def append(self, __object: _model_type) -> None:
+        if not isinstance(__object, self._model_type):
+            raise TypeError("Incorrect model type.")
+        else:
+            super().append(__object)
+
+    def insert(self, __index: int, __object: _model_type) -> None:
+        if not isinstance(__object, self._model_type):
+            raise TypeError("Incorrect model type.")
+        else:
+            super().insert(__index, __object)
+
+    def __add__(self, x: ModelList[_model_type]):
+        if not isinstance(x, ModelList) or x._model_type is not self._model_type:
+            raise TypeError("Incorrect model type.")
+        else:
+            return super().__add__(x)
+
+    def __iadd__(self, x: ModelList[_model_type]):
+        if not isinstance(x, ModelList) or x._model_type is not self._model_type:
+            raise TypeError("Incorrect model type.")
+        else:
+            return super().__iadd__(x)
+
+    def _index_models(self):
+        self._index = {None: []}
+        for model in self:
+            if model.id is None:
+                self._index[None].append(model)
+            else:
+                self._index[model.id] = model
+
+    def delete(self) -> DbOperationResult:
+        if len(self) == 0:
+            return DbOperationResult(False, "List is empty. No operation to perform.")
+        pass
+
+    def refresh(self) -> DbOperationResult:
+        if len(self) == 0:
+            return DbOperationResult(False, "List is empty. No operation to perform.")
+        q = SelectQuery(self[0].table_name).set_value(self)
+
+    def save(self, update_existing: bool = True) -> DbOperationResult:
+        if len(self) == 0:
+            return DbOperationResult(False, "List is empty. No operation to perform.")
+        pass

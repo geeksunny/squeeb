@@ -340,7 +340,7 @@ class _QueryBuilder(object):
 
     _table_name: str = None
     _value_map: Union[_QueryValueMap, _QueryValueMapGroup] = None
-    _where_conditions: Union[Condition, ConditionSequence, ConditionGroup] = None
+    _where_conditions: _ICondition = None
 
     def __init__(self,
                  table_name: str,
@@ -352,17 +352,26 @@ class _QueryBuilder(object):
             self.set_value(value_map)
         self._where_conditions = where_condition
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name is "where":
+            if not isinstance(value, _ICondition):
+                raise TypeError("Invalid value for `where conditions`.")
+            self._where_conditions = value
+        else:
+            super().__setattr__(name, value)
+
     def _get_query_str(self) -> str:
         raise NotImplementedError()
 
     def _get_args_needed(self) -> Tuple[_QueryArgs]:
         raise NotImplementedError()
 
-    def set_value(self, value_obj: Union[Dict[str, Any], List[Dict[str, Any]]]):
+    def set_value(self, value_obj: Union[Dict[str, Any], List[Dict[str, Any]]]) -> _QueryBuilder:
         if isinstance(value_obj, list):
             self._value_map = _QueryValueMapGroup.create(value_obj)
         else:
             self._value_map = _QueryValueMap(value_obj)
+        return self
 
     def _get_columns_str(self) -> str:
         return self._value_map.column_str if self._value_map is not None else "*"
