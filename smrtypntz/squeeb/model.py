@@ -5,7 +5,7 @@ from collections import namedtuple
 from typing import Type, Dict, Union, Any
 
 from .db import AbstractDbHandler
-from .query import InsertQuery, UpdateQuery, DeleteQuery, SelectQuery
+from .query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder
 
 
 DbOperationResult = namedtuple('DbOperationResult', ['success', 'error'], defaults=(False, None))
@@ -137,7 +137,7 @@ class ModelList(list, _ICrud):
     def refresh(self) -> DbOperationResult:
         if len(self) == 0:
             return DbOperationResult(False, "List is empty. No operation to perform.")
-        q = SelectQuery(self[0].table_name).set_value(self)
+        q = SelectQueryBuilder(self[0].table_name)
 
     def save(self, update_existing: bool = True) -> DbOperationResult:
         if len(self) == 0:

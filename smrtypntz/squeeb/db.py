@@ -27,7 +27,7 @@ class AbstractDbHandler(object):
     def __del__(self):
         self.close()
 
-    def _exec_raw_query_no_result(self, query_str: str, args = None) -> bool:
+    def _exec_raw_query_no_result(self, query_str: str, args=None) -> bool:
         try:
             with closing(self._conn.cursor()) as c:
                 c.execute(query_str, args)
@@ -36,7 +36,7 @@ class AbstractDbHandler(object):
             logger.error(e)
             return False
 
-    def _exec_raw_query_single_result(self, query_str: str, args = None) -> sqlite3.Row:
+    def _exec_raw_query_single_result(self, query_str: str, args=None) -> sqlite3.Row:
         try:
             with closing(self._conn.cursor()) as c:
                 c.execute(query_str, args)
@@ -54,26 +54,26 @@ class AbstractDbHandler(object):
             logger.error(e)
             return None
 
-    def _exec_query_no_result(self, query_obj) -> bool:
-        query = query_obj.build()
+    def exec_query_no_result(self, query_builder) -> bool:
+        query = query_builder.build()
         if 'error' in query:
             logger.error('QUERY BUILD ERROR: %s', query['error'])
             return False
         return self._exec_raw_query_no_result(query['query'], query['args'])
 
-    def _exec_query_single_result(self, query_obj) -> Union[sqlite3.Row, None]:
-        query = query_obj.build()
+    def exec_query_single_result(self, query_builder) -> Union[sqlite3.Row, None]:
+        query = query_builder.build()
         if 'error' in query:
             logger.error('QUERY BUILD ERROR: %s', query['error'])
             return None
         return self._exec_raw_query_single_result(query['query'], query['args'])
 
-    def _exec_query_all_results(self, query_obj) -> Union[List[sqlite3.Row], None]:
-        query = query_obj.build()
+    def exec_query_all_results(self, query_builder) -> Union[List[sqlite3.Row], None]:
+        query = query_builder.build()
         if 'error' in query:
             logger.error('QUERY BUILD ERROR: %s', query['error'])
             return None
-        return self._exec_query_raw_all_results(query['query'], query['args'])
+        return self._exec_raw_query_all_results(query['query'], query['args'])
 
     def _table_exists(self, table_name) -> bool:
         return self._exec_raw_query_single_result(
