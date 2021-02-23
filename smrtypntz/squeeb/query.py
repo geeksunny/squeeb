@@ -5,6 +5,8 @@ from collections import namedtuple
 from enum import Enum
 from typing import Any, Dict, Iterable, List, Tuple, Union
 
+from .util import _IStringable, _StringEnum
+
 
 Query = namedtuple('Query', ['query', 'args', 'error'], defaults=(None, ))
 
@@ -13,13 +15,7 @@ class QueryConditionError(Exception):
     pass
 
 
-class _StrEnum(Enum):
-
-    def __str__(self):
-        return str(self.value)
-
-
-class Operator(_StrEnum):
+class Operator(_StringEnum):
     EQUALS = '='
     NOT_EQUALS = '!='
     GREATER_THAN = '>'
@@ -32,15 +28,9 @@ class Operator(_StrEnum):
     NOT_IN = 'NOT IN'
 
 
-class Junction(_StrEnum):
+class Junction(_StringEnum):
     AND = " AND "
     OR = " OR "
-
-
-class _IStringable(object):
-
-    def __str__(self) -> str:
-        raise NotImplementedError()
 
 
 class _QueryValueHandlerMixin(object):
@@ -64,31 +54,31 @@ class _IQueryValueStrings(object):
         raise NotImplementedError()
 
 
-class _ICondition(_IStringable, _QueryValueHandlerMixin):
+class _IQueryCondition(_IStringable, _QueryValueHandlerMixin):
     pass
 
 
-class _IJuncture(object):
+class _IQueryJuncture(object):
 
     @property
-    def and_(self) -> _QueryConditionSequence:
+    def and_(self) -> _BaseQueryConditionSequence:
         raise NotImplementedError()
 
     @property
-    def or_(self) -> _QueryConditionSequence:
+    def or_(self) -> _BaseQueryConditionSequence:
         raise NotImplementedError()
 
 
-class _BaseCondition(_ICondition):
+class _BaseQueryCondition(_IQueryCondition):
 
     _column_name: str = None
     _value: Union[Any, List[Any]] = None
     _operator: Operator = Operator.EQUALS
 
-    def __init__(self, column_name_or_condition: Union[str, _BaseCondition] = None,
+    def __init__(self, column_name_or_condition: Union[str, _BaseQueryCondition] = None,
                  value: Any = None,
                  operator: Operator = None) -> None:
-        if column_name_or_condition is not None and isinstance(column_name_or_condition, _BaseCondition):
+        if column_name_or_condition is not None and isinstance(column_name_or_condition, _BaseQueryCondition):
             self._column_name = column_name_or_condition._column_name
             self._value = column_name_or_condition._value
             self._operator = column_name_or_condition._operator
@@ -144,18 +134,18 @@ class _MutableConditionMixin(object):
         return self._set_condition(Operator.NOT_IN, v)
 
 
-class QueryCondition(_BaseCondition, _IJuncture):
+class QueryCondition(_BaseQueryCondition, _IQueryJuncture):
 
     @property
-    def and_(self) -> _QueryConditionSequence:
-        return _QueryConditionSequence(self, Junction.AND)
+    def and_(self) -> _BaseQueryConditionSequence:
+        return _BaseQueryConditionSequence(self, Junction.AND)
 
     @property
-    def or_(self) -> _QueryConditionSequence:
-        return _QueryConditionSequence(self, Junction.OR)
+    def or_(self) -> _BaseQueryConditionSequence:
+        return _BaseQueryConditionSequence(self, Junction.OR)
 
 
-class MutableQueryCondition(_BaseCondition, _MutableConditionMixin):
+class MutableQueryCondition(_BaseQueryCondition, _MutableConditionMixin):
 
     def _set_condition(self, operator, value) -> QueryCondition:
         if isinstance(value, (list, set, tuple)):
@@ -167,15 +157,15 @@ class MutableQueryCondition(_BaseCondition, _MutableConditionMixin):
         return QueryCondition(self)
 
 
-class _QueryConditionSequence(_ICondition):
+class _BaseQueryConditionSequence(_IQueryCondition):
 
-    _conditions: List[Union[_ICondition, Junction]] = []
+    _conditions: List[Union[_IQueryCondition, Junction]] = []
 
-    def __init__(self, first_condition_or_sequence: Union[_ICondition, _QueryConditionSequence],
+    def __init__(self, first_condition_or_sequence: Union[_IQueryCondition, _BaseQueryConditionSequence],
                  first_junction: Junction = None) -> None:
-        if isinstance(first_condition_or_sequence, _QueryConditionSequence):
+        if isinstance(first_condition_or_sequence, _BaseQueryConditionSequence):
             self._conditions = first_condition_or_sequence._conditions
-        elif isinstance(first_condition_or_sequence, _ICondition):
+        elif isinstance(first_condition_or_sequence, _IQueryCondition):
             self._conditions.append(first_condition_or_sequence)
             if isinstance(first_junction, Junction):
                 self._conditions.append(first_junction)
@@ -186,9 +176,9 @@ class _QueryConditionSequence(_ICondition):
     def is_ready_for_condition(self) -> bool:
         return isinstance(self._conditions[-1], Junction)
 
-    def where(self, col_name_or_condition: Union[str, _BaseCondition]) -> _MutableConditionMixin:
+    def where(self, col_name_or_condition: Union[str, _BaseQueryCondition]) -> _MutableConditionMixin:
         # TODO: expand condition types accepted
-        if isinstance(col_name_or_condition, _BaseCondition):
+        if isinstance(col_name_or_condition, _BaseQueryCondition):
             self._conditions.append(col_name_or_condition)
         elif isinstance(col_name_or_condition, str):
             self._conditions.append(MutableQueryCondition(col_name_or_condition))
@@ -200,7 +190,7 @@ class _QueryConditionSequence(_ICondition):
     def _get_values(self) -> Iterable[Any]:
         values = []
         for condition in self._conditions:
-            if isinstance(condition, _ICondition):
+            if isinstance(condition, _IQueryCondition):
                 values.extend(condition.value_args)
         return values
 
@@ -208,10 +198,10 @@ class _QueryConditionSequence(_ICondition):
         return "".join(map(str, self._conditions)) if not self.is_ready_for_condition() else ""
 
 
-class QueryConditionSequence(_QueryConditionSequence, _IJuncture):
+class QueryConditionSequence(_BaseQueryConditionSequence, _IQueryJuncture):
 
     @property
-    def and_(self) -> _QueryConditionSequence:
+    def and_(self) -> _BaseQueryConditionSequence:
         if not self.is_ready_for_condition():
             self._conditions.append(Junction.AND)
             return self
@@ -219,7 +209,7 @@ class QueryConditionSequence(_QueryConditionSequence, _IJuncture):
             raise QueryConditionError("Condition sequence out of order.")
 
     @property
-    def or_(self) -> _QueryConditionSequence:
+    def or_(self) -> _BaseQueryConditionSequence:
         if not self.is_ready_for_condition():
             self._conditions.append(Junction.OR)
             return self
@@ -227,7 +217,7 @@ class QueryConditionSequence(_QueryConditionSequence, _IJuncture):
             raise QueryConditionError("Condition sequence out of order.")
 
 
-class MutableQueryConditionSequence(_QueryConditionSequence, _MutableConditionMixin):
+class MutableQueryConditionSequence(_BaseQueryConditionSequence, _MutableConditionMixin):
 
     def _set_condition(self, operator, value):
         if isinstance(self._conditions[-1], _MutableConditionMixin):
@@ -238,12 +228,12 @@ class MutableQueryConditionSequence(_QueryConditionSequence, _MutableConditionMi
         return QueryConditionSequence(self)
 
 
-class QueryConditionGroup(list, _ICondition, _IJuncture):
+class QueryConditionGroup(list, _IQueryCondition, _IQueryJuncture):
 
-    _conditions: List[_ICondition] = []
+    _conditions: List[_IQueryCondition] = []
     _group_junction: Junction = None
 
-    def __init__(self, group_junction: Junction, conditions: Iterable[_ICondition]) -> None:
+    def __init__(self, group_junction: Junction, conditions: Iterable[_IQueryCondition]) -> None:
         super().__init__()
         self._group_junction = group_junction
         self._conditions.extend(conditions)
@@ -261,14 +251,14 @@ class QueryConditionGroup(list, _ICondition, _IJuncture):
         if self._group_junction is junction:
             return self
         else:
-            return _QueryConditionSequence(self, junction)
+            return _BaseQueryConditionSequence(self, junction)
 
     @property
-    def and_(self) -> _QueryConditionSequence:
+    def and_(self) -> _BaseQueryConditionSequence:
         return self.__join(Junction.AND)
 
     @property
-    def or_(self) -> _QueryConditionSequence:
+    def or_(self) -> _BaseQueryConditionSequence:
         return self.__join(Junction.OR)
 
 
@@ -340,7 +330,7 @@ class AbstractQueryBuilder(object):
 
     _table_name: str = None
     _value_map: Union[_QueryValueMap, _QueryValueMapGroup] = None
-    _where_conditions: _ICondition = None
+    _where_conditions: _IQueryCondition = None
 
     def __init__(self,
                  table_name: str,
@@ -354,7 +344,7 @@ class AbstractQueryBuilder(object):
 
     def __setattr__(self, name: str, value: Any) -> None:
         if name is "where":
-            if not isinstance(value, _ICondition):
+            if not isinstance(value, _IQueryCondition):
                 raise TypeError("Invalid value for `where conditions`.")
             self._where_conditions = value
         else:
