@@ -1,14 +1,18 @@
 from __future__ import annotations
 
 import string
-from collections import namedtuple
+from dataclasses import dataclass
 from enum import Enum
 from typing import Any, Dict, Iterable, List, Tuple, Union
 
 from .util import _IStringable, _StringEnum
 
 
-Query = namedtuple('Query', ['query', 'args', 'error'], defaults=(None, ))
+@dataclass
+class Query:
+    query: str = None
+    args: Tuple[Any, ...] = None
+    error: Union[str, Exception] = None
 
 
 class QueryConditionError(Exception):
@@ -343,7 +347,7 @@ class AbstractQueryBuilder(object):
         self._where_conditions = where_condition
 
     def __setattr__(self, name: str, value: Any) -> None:
-        if name is "where":
+        if name == "where":
             if not isinstance(value, _IQueryCondition):
                 raise TypeError("Invalid value for `where conditions`.")
             self._where_conditions = value

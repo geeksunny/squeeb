@@ -4,6 +4,35 @@ import logging
 import sqlite3
 from contextlib import closing
 from typing import Any, List, Tuple, Union
+from dataclasses import dataclass
+
+
+class BaseDbHandlerResult:
+    @property
+    def success(self):
+        return self.error is not None
+
+
+@dataclass(frozen=True)
+class DbHandlerNoResult(BaseDbHandlerResult):
+    rowcount: int = 0
+    error: sqlite3.Error = None
+
+
+@dataclass(frozen=True)
+class DbHandlerSingleResult(BaseDbHandlerResult):
+    row: sqlite3.Row = None
+    error: sqlite3.Error = None
+
+
+@dataclass(frozen=True)
+class DbHandlerMultiResult(BaseDbHandlerResult):
+    rows: List[sqlite3.Row] = None
+    error: sqlite3.Error = None
+
+    @property
+    def rowcount(self):
+        return len(self.rows) if self.rows is not None else 0
 
 
 logger = logging.getLogger()

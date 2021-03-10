@@ -1,14 +1,24 @@
 from __future__ import annotations
 
 import sqlite3
-from collections import namedtuple
 from typing import Type, Dict, Union, Any
+from dataclasses import dataclass, field
 
 from .db import AbstractDbHandler
 from .query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder
 
 
-DbOperationResult = namedtuple('DbOperationResult', ['success', 'error'], defaults=(False, None))
+class DbOperationError(Exception):
+    pass
+
+
+@dataclass(frozen=True)
+class DbOperationResult:
+    error: DbOperationError = None
+
+    @property
+    def success(self):
+        return self.error is not None
 
 
 class _ICrud(object):
@@ -84,6 +94,11 @@ class AbstractModel(dict, _ICrud):
                 if sqlite_field_mapping is not None and sql_key in sqlite_field_mapping\
                 else sql_key
             self[key] = row[sql_key]
+
+
+@dataclass(frozen=True)
+class DbOperationResults(DbOperationResult):
+    results: Dict[ModelType, DbOperationResult] = field(default_factory=dict)
 
 
 class ModelList(list, _ICrud):
