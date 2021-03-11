@@ -2,11 +2,17 @@ from __future__ import annotations
 
 import squeeb
 
+_track_fields = {'id', 'spotify_id', 'filepath', 'name', 'duration', 'artist_id', 'album_artist_id', 'album_id',
+                 'album_track_number', 'danceability', 'energy', 'instrumentalness', 'key', 'liveness', 'loudness',
+                 'mode', 'speechiness', 'tempo', 'time_signature', 'valence'}
+_artist_fields = {'id', 'spotify_id', 'name', 'spotify_genres', 'spotify_popularity'}
+_album_fields = {'id', 'spotify_id', 'name', 'year', 'genres', 'artist_id', 'spotify_genres'}
+
 
 class Track(squeeb.AbstractModel):
 
     def __init__(self) -> None:
-        super().__init__(db, "tracks")
+        super().__init__(db, "tracks", _track_fields)
 
     def populate(self, taglib_song) -> None:
         self['filepath'] = taglib_song.path
@@ -30,7 +36,7 @@ class Track(squeeb.AbstractModel):
 class Artist(squeeb.AbstractModel):
 
     def __init__(self) -> None:
-        super().__init__(db, "artists")
+        super().__init__(db, "artists", _artist_fields)
 
     def populate(self, taglib_song) -> None:
         self._set_if_tag_exists('name', taglib_song, 'ARTIST')
@@ -49,7 +55,7 @@ class Artist(squeeb.AbstractModel):
 class Album(squeeb.AbstractModel):
 
     def __init__(self) -> None:
-        super().__init__(db, "albums")
+        super().__init__(db, "albums", _album_fields)
 
     def populate(self, taglib_song) -> None:
         # todo: genres field... array of all genres in tracks?
