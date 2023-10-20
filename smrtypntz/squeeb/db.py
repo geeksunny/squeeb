@@ -3,8 +3,12 @@ from __future__ import annotations
 import logging
 import sqlite3
 from contextlib import closing
-from typing import Any, List, Tuple, Union
 from dataclasses import dataclass
+from typing import Any, List, Tuple, TypeVar
+
+from .query import AbstractQueryBuilder
+
+QueryBuilder = TypeVar("QueryBuilder", bound=AbstractQueryBuilder)
 
 
 class BaseDbHandlerResult:
@@ -56,53 +60,62 @@ class AbstractDbHandler(object):
     def __del__(self):
         self.close()
 
-    def _exec_raw_query_no_result(self, query_str: str, args=None) -> bool:
+    def _exec_raw_query_no_result(self, query_str: str, args=None) -> DbHandlerNoResult:
         try:
             with closing(self._conn.cursor()) as c:
                 c.execute(query_str, args)
-                return True
+                return DbHandlerNoResult(c.rowcount)
         except sqlite3.Error as e:
             logger.error(e)
-            return False
+            return DbHandlerNoResult(error=e)
 
-    def _exec_raw_query_single_result(self, query_str: str, args=None) -> sqlite3.Row:
+    def _exec_raw_query_single_result(self, query_str: str, args=None) -> DbHandlerSingleResult:
         try:
             with closing(self._conn.cursor()) as c:
                 c.execute(query_str, args)
-                return c.fetchone()
+                return DbHandlerSingleResult(c.fetchone())
         except sqlite3.Error as e:
             logger.error(e)
-            return None
+            return DbHandlerSingleResult(error=e)
 
-    def _exec_raw_query_all_results(self, query_str: str, args: Tuple[Any] = None) -> Union[List[sqlite3.Row], None]:
+    def _exec_raw_query_all_results(self, query_str: str, args: Tuple[Any] = None) -> DbHandlerMultiResult:
         try:
             with closing(self._conn.cursor()) as c:
                 c.execute(query_str, args)
-                return c.fetchall()
+                return DbHandlerMultiResult(c.fetchall())
         except sqlite3.Error as e:
             logger.error(e)
-            return None
+            return DbHandlerMultiResult(error=e)
 
-    def exec_query_no_result(self, query_builder) -> bool:
+    def exec_query_no_result(self, query_builder: QueryBuilder) -> DbHandlerNoResult:
         query = query_builder.build()
         if 'error' in query:
             logger.error('QUERY BUILD ERROR: %s', query['error'])
-            return False
+            return DbHandlerNoResult(error=query['error'])
         return self._exec_raw_query_no_result(query['query'], query['args'])
 
-    def exec_query_single_result(self, query_builder) -> Union[sqlite3.Row, None]:
+    def exec_query_single_result(self, query_builder: QueryBuilder) -> DbHandlerSingleResult:
         query = query_builder.build()
         if 'error' in query:
             logger.error('QUERY BUILD ERROR: %s', query['error'])
-            return None
+            return DbHandlerSingleResult(error=query['error'])
         return self._exec_raw_query_single_result(query['query'], query['args'])
 
-    def exec_query_all_results(self, query_builder) -> Union[List[sqlite3.Row], None]:
+    def exec_query_all_results(self, query_builder: QueryBuilder) -> DbHandlerMultiResult:
         query = query_builder.build()
         if 'error' in query:
             logger.error('QUERY BUILD ERROR: %s', query['error'])
-            return None
+            return DbHandlerMultiResult(error=query['error'])
         return self._exec_raw_query_all_results(query['query'], query['args'])
+
+    def exec_many_no_result(self, query_builder: QueryBuilder) -> List[DbHandlerNoResult]:
+        pass
+
+    def exec_many_single_result(self, query_builder: QueryBuilder) -> List[DbHandlerSingleResult]:
+        pass
+
+    def exec_many_all_results(self, query_builder: QueryBuilder) -> List[DbHandlerMultiResult]:
+        pass
 
     def _table_exists(self, table_name) -> bool:
         return self._exec_raw_query_single_result(

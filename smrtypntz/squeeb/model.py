@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass, field
-from typing import Type, Dict, Any, TypeVar, Set
+from typing import Type, Dict, Any, TypeVar, Generator, Set
 
 from .db import AbstractDbHandler
-from .query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder
+from .query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
 
 
 class DbOperationError(Exception):
@@ -97,12 +97,33 @@ class AbstractModel(dict, _ICrud):
 
     def delete(self) -> DbOperationResult:
         pass
+        if self.id is None:
+            return DbOperationResult("Model is not saved and cannot be deleted. No action took place.")
+        else:
+            q = DeleteQueryBuilder(self._table_name)
+            q.where = where(self._id_col_name).equals(self.id)
+            result = self._db_handler.exec_query_no_result(q)
+            if isinstance(result, sqlite3.Error):
+                return DbOperationResult(error=DbOperationError(result))
+            elif isinstance(result, int):
+                return DbOperationResult("Rows changed: %d" % result)
+            else:
+                return DbOperationResult(error=DbOperationError("Unknown error encountered."))
 
     def refresh(self) -> DbOperationResult:
         pass
 
     def save(self, update_existing: bool = True) -> DbOperationResult:
-        pass
+        if self.id is None:
+            q = InsertQueryBuilder(self._table_name).set_value(self)
+            action = 'Insert'
+        else:
+            q = UpdateQueryBuilder(self._table_name).set_value(self)
+            q.where = where(self._id_col_name).equals(self.id)
+            action = 'Update'
+        result = self._db_handler.exec_query_single_result(q)
+        return DbOperationResult('%s operation %s' % (action, 'success' if result.success else 'failure'),
+                                 [result.row], DbOperationError(result.error) if result.error is not None else None)
 
     def _set_if_tag_exists(self, field_name, source, source_field=None) -> None:
         if source_field is None:
@@ -174,15 +195,56 @@ class ModelList(list, _ICrud):
 
     def delete(self) -> DbOperationResults:
         if len(self) == 0:
-            return DbOperationResult(False, "List is empty. No operation to perform.")
-        pass
+            return DbOperationResult("List is empty. No operation to perform.")
+        ids = []
+        cant_update = []
+        for model in self:
+            if model is not None:
+                if model.id is not None:
+                    ids.append(model.id)
+                else:
+                    cant_update.append(model)
+        if len(ids) > 0:
+            q = DeleteQueryBuilder(self[0].table_name)
+            q.where = where(self[0].id_col_name).is_in(ids)
+            result = self[0].db_handler.exec_query_no_result(q)
+            msg = '%d of %d rows deleted. %d skipped.' % (result.rowcount, len(ids), len(cant_update) > 0)
+            return DbOperationResult(msg, error=result.error, row_count=result.rowcount)
+        else:
+            return DbOperationResult('%d of %d rows skipped.' % (len(cant_update), len(self)))
 
     def refresh(self) -> DbOperationResults:
         if len(self) == 0:
-            return DbOperationResult(False, "List is empty. No operation to perform.")
+            return DbOperationResult("List is empty. No operation to perform.")
+        self._index_models()
+        ids = list(filter(lambda k: k is not None, self._index.keys()))
         q = SelectQueryBuilder(self[0].table_name)
+        q.where = where(self[0].id_col_name).is_in(ids)
+        self[0].db_handler.exec_query_all_results(q)
 
     def save(self, update_existing: bool = True) -> DbOperationResults:
         if len(self) == 0:
-            return DbOperationResult(False, "List is empty. No operation to perform.")
+            return [DbOperationResult("List is empty. No operation to perform.")]
+        save = []
+        update = []
+        results = []
+        for model in self:
+            if model.id is None:
+                save.append(model)
+            else:
+                update.append(model)
+        if len(save) > 0:
+            pass
+        if len(update) > 0:
+            pass
+        for model in save:
+            pass
+        for model in update:
+            pass
+        return results
+
+    def _save_many(self):
+        pass
+
+    def _update_many(self):
         pass

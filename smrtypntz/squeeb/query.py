@@ -3,7 +3,7 @@ from __future__ import annotations
 import string
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Dict, Iterable, List, Tuple, Union
+from typing import Any, Dict, Iterable, List, Tuple, Union, Generator, TypeVar
 
 from .util import _IStringable, _StringEnum
 
@@ -37,13 +37,16 @@ class Junction(_StringEnum):
     OR = " OR "
 
 
+QueryValues = TypeVar('QueryValues', Tuple[Any, ...], Generator[Tuple[Any, ...], None, None])
+
+
 class _QueryValueHandlerMixin(object):
 
-    def _get_values(self) -> Iterable[Any]:
+    def _get_values(self) -> QueryValues:
         raise NotImplementedError()
 
     @property
-    def value_args(self) -> Iterable[Any]:
+    def value_args(self) -> QueryValues:
         return self._get_values()
 
 
@@ -91,8 +94,8 @@ class _BaseQueryCondition(_IQueryCondition):
             self._value = value
             self._operator = operator
 
-    def _get_values(self) -> Iterable[Any]:
-        return self._value if isinstance(self._value, list) else [self._value]
+    def _get_values(self) -> QueryValues:
+        return tuple(self._value) if isinstance(self._value, list) else (self._value, )
 
     def __str__(self) -> str:
         if self._column_name is None or self._value is None:
@@ -191,12 +194,12 @@ class _BaseQueryConditionSequence(_IQueryCondition):
             pass
         return MutableQueryConditionSequence(self)
 
-    def _get_values(self) -> Iterable[Any]:
+    def _get_values(self) -> QueryValues:
         values = []
         for condition in self._conditions:
             if isinstance(condition, _IQueryCondition):
                 values.extend(condition.value_args)
-        return values
+        return tuple(values)
 
     def __str__(self) -> str:
         return "".join(map(str, self._conditions)) if not self.is_ready_for_condition() else ""
@@ -242,7 +245,7 @@ class QueryConditionGroup(list, _IQueryCondition, _IQueryJuncture):
         self._group_junction = group_junction
         self._conditions.extend(conditions)
 
-    def _get_values(self) -> Iterable[Any]:
+    def _get_values(self) -> QueryValues:
         values = []
         for condition in self._conditions:
             values.extend(condition.value_args)
@@ -272,8 +275,8 @@ class _QueryValueMap(dict, _QueryValueHandlerMixin, _IQueryValueStrings):
         super().__init__()
         self.update(values)
 
-    def _get_values(self) -> Iterable[Any]:
-        return self.values()
+    def _get_values(self) -> Tuple[Any, ...]:
+        return tuple(self.values())
 
     @property
     def column_str(self) -> str:
@@ -309,11 +312,9 @@ class _QueryValueMapGroup(_QueryValueHandlerMixin, _IQueryValueStrings):
             raise TypeError("Object must be a _QueryValueMap")
         self._value_maps.append(value_map)
 
-    def _get_values(self) -> Iterable[Any]:
-        result = []
+    def _get_values(self) -> Generator[Tuple[Any, ...]]:
         for value_map in self._value_maps:
-            result.extend(value_map.value_args)
-        return result
+            yield value_map.value_args
 
     @property
     def column_str(self) -> str:
