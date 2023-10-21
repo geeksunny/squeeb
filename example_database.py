@@ -131,6 +131,26 @@ class _MusicDb(squeeb.AbstractDbHandler):
                 "valence" REAL
             )''')
 
+    def get_all_artists(self) -> List[Artist]:
+        query = squeeb.SelectQueryBuilder('artists')
+        rows = self._exec_query_all_results(query)
+        # TODO: Deserialize the results into Artist objects
+
+    def get_all_artists(self) -> List[Artist]:
+        query = squeeb.SelectQueryBuilder('artists')
+        rows = self._exec_query_all_results(query)
+        # TODO: Deserialize the results into Artist objects
+
+    def get_all_artists(self) -> List[Artist]:
+        query = squeeb.SelectQueryBuilder('artists')
+        rows = self._exec_query_all_results(query)
+        # TODO: Deserialize the results into Artist objects
+
 
 # Singleton instance of the db handler
 db = _MusicDb()
+
+artist = Artist.from_dict({"name":1})
+album = Album.from_dict({"name":"cool"})
+
+print(str(artist))

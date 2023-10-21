@@ -2,7 +2,7 @@ import logging
 import json
 import os
 import taglib
-from smrtypntz.database import db
+from example_database import db
 # import spotipy
 import sys
 
