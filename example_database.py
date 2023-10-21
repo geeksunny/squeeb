@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import List
+
 import squeeb
 
 _track_fields = {'id', 'spotify_id', 'filepath', 'name', 'duration', 'artist_id', 'album_artist_id', 'album_id',
@@ -65,8 +67,6 @@ class Album(squeeb.AbstractModel):
     def set_artist(self, artist):
         if 'id' in artist:
             self['artist_id'] = artist['id']
-
-
 
 
 class _MusicDb(squeeb.AbstractDbHandler):
@@ -150,7 +150,7 @@ class _MusicDb(squeeb.AbstractDbHandler):
 # Singleton instance of the db handler
 db = _MusicDb()
 
-artist = Artist.from_dict({"name":1})
-album = Album.from_dict({"name":"cool"})
+artist = Artist.from_dict({"name": 1})
+album = Album.from_dict({"name": "cool"})
 
 print(str(artist))

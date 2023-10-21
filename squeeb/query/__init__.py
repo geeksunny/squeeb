@@ -1,2 +1,2 @@
 from .conditions import QueryCondition, QueryConditionError, MutableQueryCondition
-from .queries import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
+from .queries import AbstractQueryBuilder, InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
