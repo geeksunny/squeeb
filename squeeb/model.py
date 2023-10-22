@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, InitVar
 from typing import Type, Dict, Any, TypeVar, Generator, Set
 
 from .db import AbstractDbHandler
@@ -14,7 +14,7 @@ class DbOperationError(Exception):
 
 @dataclass(frozen=True)
 class DbOperationResult:
-    error: DbOperationError = None
+    error: DbOperationError | str = None
 
     @property
     def success(self):

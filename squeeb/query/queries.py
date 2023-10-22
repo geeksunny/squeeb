@@ -3,10 +3,9 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Tuple, Union, Any, Dict, List
 
-from squeeb import QueryCondition
-from squeeb.query.conditions import _IQueryCondition, QueryConditionSequence, QueryConditionGroup, MutableQueryCondition
+from squeeb.query.conditions import _IQueryCondition, QueryConditionSequence, QueryConditionGroup, \
+    MutableQueryCondition, QueryCondition
 from squeeb.query.values import _QueryValueMap, _QueryValueMapGroup
-from squeeb.util import _StringEnum
 
 
 @dataclass
@@ -15,18 +14,6 @@ class Query:
     args: Tuple[Any, ...] = None
     error: Union[str, Exception] = None
 
-
-class Operator(_StringEnum):
-    EQUALS = '='
-    NOT_EQUALS = '!='
-    GREATER_THAN = '>'
-    GREATER_THAN_EQUALS = '>='
-    LESS_THAN = '<'
-    LESS_THAN_EQUALS = '<='
-    LIKE = 'LIKE'
-    GLOB = 'GLOB'
-    IN = 'IN'
-    NOT_IN = 'NOT IN'
 
 
 class _QueryArgs(Enum):

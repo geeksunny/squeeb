@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Iterable, Union, Any
 
-from squeeb.query.queries import Operator
+from squeeb.query._queries import Operator
 from squeeb.query.values import _QueryValueHandlerMixin, QueryValues
 from squeeb.util import _IStringable, _StringEnum
 
