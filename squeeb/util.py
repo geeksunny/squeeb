@@ -1,10 +1,12 @@
+from abc import ABCMeta, abstractmethod
 from enum import Enum
 
 
-class _IStringable(object):
+class _IStringable(object, metaclass=ABCMeta):
 
+    @abstractmethod
     def __str__(self) -> str:
-        raise NotImplementedError()
+        pass
 
 
 class _StringEnum(Enum):

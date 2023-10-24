@@ -1,30 +1,34 @@
 from __future__ import annotations
 
+from abc import ABCMeta, abstractmethod
 from typing import TypeVar, Dict, Tuple, Any, Iterable, List, Generator
 
 
 QueryValues = TypeVar('QueryValues', Tuple[Any, ...], Generator[Tuple[Any, ...], None, None])
 
 
-class _QueryValueHandlerMixin(object):
+class _QueryValueHandlerMixin(object, metaclass=ABCMeta):
 
+    @abstractmethod
     def _get_values(self) -> QueryValues:
-        raise NotImplementedError()
+        pass
 
     @property
     def value_args(self) -> QueryValues:
         return self._get_values()
 
 
-class _IQueryValueStrings(object):
+class _IQueryValueStrings(object, metaclass=ABCMeta):
 
     @property
+    @abstractmethod
     def column_str(self) -> str:
-        raise NotImplementedError()
+        pass
 
     @property
+    @abstractmethod
     def values_str(self) -> str:
-        raise NotImplementedError()
+        pass
 
 
 class _QueryValueMap(dict, _QueryValueHandlerMixin, _IQueryValueStrings):

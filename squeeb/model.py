@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, field, InitVar
 from typing import Type, Dict, Any, TypeVar, Generator, Set
 
@@ -21,19 +22,22 @@ class DbOperationResult:
         return self.error is not None
 
 
-class _ICrud(object):
+class _ICrud(object, metaclass=ABCMeta):
 
+    @abstractmethod
     def delete(self) -> DbOperationResult:
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def refresh(self) -> DbOperationResult:
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def save(self, update_existing: bool = True) -> DbOperationResult:
-        raise NotImplementedError()
+        pass
 
 
-class AbstractModel(dict, _ICrud):
+class AbstractModel(dict, _ICrud, metaclass=ABCMeta):
     # _db_handler: AbstractDbHandler
     # _table_name: str
     # _id_col_name: str
@@ -132,8 +136,9 @@ class AbstractModel(dict, _ICrud):
             self[field_name] = source[source_field][0] if isinstance(source[source_field], list)\
                 else source[source_field]
 
+    @abstractmethod
     def populate(self, taglib_song) -> None:
-        raise NotImplementedError()
+        pass
 
     def from_sqlite(self, row: sqlite3.Row, sqlite_field_mapping=None) -> None:
         for sql_key in row.keys():

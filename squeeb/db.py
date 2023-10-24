@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+from abc import ABCMeta, abstractmethod
 from contextlib import closing
 from dataclasses import dataclass
 from typing import Any, List, Tuple, TypeVar
@@ -42,7 +43,7 @@ class DbHandlerMultiResult(BaseDbHandlerResult):
 logger = logging.getLogger()
 
 
-class AbstractDbHandler(object):
+class AbstractDbHandler(object, metaclass=ABCMeta):
 
     _conn = None
 
@@ -51,11 +52,13 @@ class AbstractDbHandler(object):
         self._conn = sqlite3.connect(self._db_filename())
         self._conn.row_factory = sqlite3.Row
 
+    @abstractmethod
     def _db_filename(self) -> str:
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def _init_tables(self) -> bool:
-        raise NotImplementedError()
+        pass
 
     def __del__(self):
         self.close()

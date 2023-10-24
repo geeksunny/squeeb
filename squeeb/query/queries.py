@@ -1,4 +1,5 @@
 import string
+from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
 from typing import Tuple, Union, Any, Dict, List
@@ -25,7 +26,7 @@ class AbstractQueryBuilder:
     pass
 
 
-class AbstractQueryBuilder(object):
+class AbstractQueryBuilder(object, metaclass=ABCMeta):
 
     _table_name: str = None
     _value_map: Union[_QueryValueMap, _QueryValueMapGroup] = None
@@ -49,11 +50,13 @@ class AbstractQueryBuilder(object):
         else:
             super().__setattr__(name, value)
 
+    @abstractmethod
     def _get_query_str(self) -> str:
-        raise NotImplementedError()
+        pass
 
+    @abstractmethod
     def _get_args_needed(self) -> Tuple[_QueryArgs]:
-        raise NotImplementedError()
+        pass
 
     def set_value(self, value_obj: Union[Dict[str, Any], List[Dict[str, Any]]]) -> AbstractQueryBuilder:
         if isinstance(value_obj, list):

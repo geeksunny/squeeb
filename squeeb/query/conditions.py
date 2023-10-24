@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABCMeta, abstractmethod
 from typing import List, Iterable, Union, Any
 
 from squeeb.query._queries import Operator
@@ -20,15 +21,17 @@ class _IQueryCondition(_IStringable, _QueryValueHandlerMixin):
     pass
 
 
-class _IQueryJuncture(object):
+class _IQueryJuncture(object, metaclass=ABCMeta):
 
     @property
+    @abstractmethod
     def and_(self) -> _BaseQueryConditionSequence:
-        raise NotImplementedError()
+        pass
 
     @property
+    @abstractmethod
     def or_(self) -> _BaseQueryConditionSequence:
-        raise NotImplementedError()
+        pass
 
 
 class _BaseQueryCondition(_IQueryCondition):
@@ -61,10 +64,11 @@ class _BaseQueryCondition(_IQueryCondition):
         return '%s %s %s' % (self._column_name, self._operator.value, value)
 
 
-class _MutableConditionMixin(object):
+class _MutableConditionMixin(object, metaclass=ABCMeta):
 
+    @abstractmethod
     def _set_condition(self, operator, value):
-        raise NotImplementedError()
+        pass
 
     def equals(self, value):
         return self._set_condition(Operator.EQUALS, value)
