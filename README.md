@@ -1,6 +1,6 @@
 # squeeb
 
-squeeb is a little ORM sqlite library for Python.
+squeeb is An attempt at building an ORM for SQLite in Python.
 
 ### Requirements
 

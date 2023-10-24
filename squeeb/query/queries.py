@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import string
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
@@ -20,10 +22,6 @@ class Query:
 class _QueryArgs(Enum):
     VALUE = 1
     WHERE = 2
-
-
-class AbstractQueryBuilder:
-    pass
 
 
 class AbstractQueryBuilder(object, metaclass=ABCMeta):
