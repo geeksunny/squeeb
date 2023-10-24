@@ -5,8 +5,9 @@ from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, field, InitVar
 from typing import Type, Dict, Any, TypeVar, Generator, Set
 
-from .db import AbstractDbHandler
-from .query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
+from squeeb.db import AbstractDbHandler
+from squeeb.query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
+from squeeb.util import _StringEnum
 
 
 class DbOperationError(Exception):
