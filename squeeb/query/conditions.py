@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
+from enum import StrEnum
 from typing import List, Iterable, Union, Any
 
 from squeeb.query._queries import Operator
 from squeeb.query.values import _QueryValueHandlerMixin, QueryValues
-from squeeb.util import _IStringable, _StringEnum
+from squeeb.util import _IStringable
 
 
 class QueryConditionError(Exception):
     pass
 
 
-class Junction(_StringEnum):
+class Junction(StrEnum):
     AND = " AND "
     OR = " OR "
 

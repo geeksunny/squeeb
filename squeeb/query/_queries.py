@@ -1,7 +1,7 @@
-from squeeb.util import _StringEnum
+from enum import StrEnum
 
 
-class Operator(_StringEnum):
+class Operator(StrEnum):
     EQUALS = '='
     NOT_EQUALS = '!='
     GREATER_THAN = '>'

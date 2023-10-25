@@ -2,12 +2,11 @@ from __future__ import annotations
 
 import sqlite3
 from abc import ABCMeta, abstractmethod
-from dataclasses import dataclass, field, InitVar
-from typing import Type, Dict, Any, TypeVar, Generator, Set
+from dataclasses import dataclass, field
+from typing import Type, Dict, Any, TypeVar, Set
 
 from squeeb.db import AbstractDbHandler
 from squeeb.query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
-from squeeb.util import _StringEnum
 
 
 class DbOperationError(Exception):
