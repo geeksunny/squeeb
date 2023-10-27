@@ -66,9 +66,9 @@ class ForeignKey(ColumnConstraint):
     def __str__(self) -> str:
         output = [f'REFERENCES "{self.foreign_table}"("{self.foreign_column}")']
         if self.on_delete_action is not None:
-            output.append(self.on_delete_action)
+            output.append(f'ON DELETE {self.on_delete_action}')
         if self.on_update_action is not None:
-            output.append(self.on_update_action)
+            output.append(f'ON UPDATE {self.on_update_action}')
         return ' '.join(output)
 
 
@@ -92,6 +92,43 @@ class Unique(ColumnConstraint):
         if self.conflict_clause is not None:
             output.append(self.conflict_clause)
         return ' '.join(output)
+
+
+class CollateSequence(StrEnum):
+    BINARY = "BINARY"
+    NOCASE = "NOCASE"
+    RTRIM = "RTRIM"
+
+
+@dataclass
+class Collate(ColumnConstraint):
+    sequence: CollateSequence
+
+    def __str__(self):
+        return f'COLLATE {self.sequence}' if isinstance(self.sequence, CollateSequence) else ''
+
+
+class Defaults(StrEnum):
+    CURRENT_TIME = "CURRENT_TIME"  # "HH:MM:SS"
+    CURRENT_DATE = "CURRENT_DATE"  # "YYYY-MM-DD"
+    CURRENT_TIMESTAMP = "CURRENT_TIMESTAMP"  # "YYYY-MM-DD HH:MM:SS"
+    NULL = "NULL"
+
+
+@dataclass(frozen=True)
+class DefaultValue(ColumnConstraint):
+    value: Any = None
+
+    def __str__(self) -> str:
+        return f'DEFAULT {self.value}' if self.value is not None else ''
+
+
+class DefaultExpression(DefaultValue):
+
+    def __getattribute__(self, __name):
+        if __name == 'value':
+            return f'({super().__getattribute__(__name)})'
+        return super().__getattribute__(__name)
 
 
 @dataclass
