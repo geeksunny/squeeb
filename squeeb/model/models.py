@@ -51,12 +51,15 @@ class ModelMetaClass(ABCMeta):
         return result_class
 
     def __setattr__(self, __name, __value):
-        if __name is '__mapping__' and isinstance(__value, Dict):
-            '''When setting column mapping, if a mapping already exists then the new mapping will be combined with the
-            old mapping. This ensures extended models will have a mapping for all inherited fields. The mapping will be
-            stored as a MappingProxy to ensure a read-only status. MappingProxyType is imported as FrozenDict to convey
-            intended use case.'''
-            __value = FrozenDict(getattr(self, __name) | __value) if hasattr(self, __name) else FrozenDict(__value)
+        if __name is '__mapping__':
+            if isinstance(__value, Dict):
+                '''When setting column mapping, if a mapping already exists then the new mapping will be combined with the
+                old mapping. This ensures extended models will have a mapping for all inherited fields. The mapping will be
+                stored as a MappingProxy to ensure a read-only status. MappingProxyType is imported as FrozenDict to convey
+                intended use case.'''
+                __value = FrozenDict(getattr(self, __name) | __value) if hasattr(self, __name) else FrozenDict(__value)
+            else:
+                raise TypeError("Column mapping must be a dictionary.")
         super().__setattr__(__name, __value)
 
 
