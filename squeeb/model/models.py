@@ -3,10 +3,12 @@ from __future__ import annotations
 import sqlite3
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass, field
+from types import MappingProxyType as FrozenDict
 from typing import Type, Dict, Any, TypeVar, Set
 
 from squeeb.db import AbstractDbHandler
 from squeeb.query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
+from .columns import TableColumn
 
 
 class DbOperationError(Exception):
@@ -35,6 +37,27 @@ class _ICrud(object, metaclass=ABCMeta):
     @abstractmethod
     def save(self, update_existing: bool = True) -> DbOperationResult:
         pass
+
+
+class ModelMetaClass(ABCMeta):
+
+    def __new__(metacls, cls, bases, classdict, **kwargs):
+        mapping = {}
+        for name, value in classdict.items():
+            if isinstance(value, TableColumn):
+                mapping[name] = value.column_name if value.column_name is not None else name
+        result_class = super().__new__(metacls, cls, bases, classdict, **kwargs)
+        result_class.__mapping__ = mapping
+        return result_class
+
+    def __setattr__(self, __name, __value):
+        if __name is '__mapping__' and isinstance(__value, Dict):
+            '''When setting column mapping, if a mapping already exists then the new mapping will be combined with the
+            old mapping. This ensures extended models will have a mapping for all inherited fields. The mapping will be
+            stored as a MappingProxy to ensure a read-only status. MappingProxyType is imported as FrozenDict to convey
+            intended use case.'''
+            __value = FrozenDict(getattr(self, __name) | __value) if hasattr(self, __name) else FrozenDict(__value)
+        super().__setattr__(__name, __value)
 
 
 class AbstractModel(dict, _ICrud, metaclass=ABCMeta):
