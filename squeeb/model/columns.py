@@ -134,7 +134,6 @@ class DefaultExpression(DefaultValue):
 @dataclass
 class TableColumn(metaclass=ABCMeta):
     value: Any
-    test: str = None
 
     @property
     @abstractmethod

@@ -2,13 +2,14 @@ from __future__ import annotations
 
 import sqlite3
 from abc import ABCMeta, abstractmethod
+from copy import deepcopy
 from dataclasses import dataclass, field
 from types import MappingProxyType as FrozenDict
-from typing import Type, Dict, Any, TypeVar, Set
+from typing import Type, Dict, Any, TypeVar, Set, List
 
 from squeeb.db import AbstractDbHandler
 from squeeb.query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
-from .columns import TableColumn
+from .columns import TableColumn, PrimaryKey
 
 
 class DbOperationError(Exception):
@@ -53,61 +54,64 @@ class ModelMetaClass(ABCMeta):
     def __setattr__(self, __name, __value):
         if __name is '__mapping__':
             if isinstance(__value, Dict):
-                '''When setting column mapping, if a mapping already exists then the new mapping will be combined with the
-                old mapping. This ensures extended models will have a mapping for all inherited fields. The mapping will be
-                stored as a MappingProxy to ensure a read-only status. MappingProxyType is imported as FrozenDict to convey
-                intended use case.'''
+                """When setting the column mapping, if a mapping already exists then the new mapping will be combined
+                with the old mapping. This ensures extended models will have a mapping for all inherited fields.
+                The mapping will be stored as a MappingProxy to ensure a read-only status. MappingProxyType is imported
+                as FrozenDict to convey intended use case."""
                 __value = FrozenDict(getattr(self, __name) | __value) if hasattr(self, __name) else FrozenDict(__value)
+                setattr(self, '__mapping_inverse__', FrozenDict(dict(map(reversed, __value.items()))))
             else:
                 raise TypeError("Column mapping must be a dictionary.")
+        elif __name is '__mapping_inverse__':
+            if not isinstance(__value, FrozenDict):
+                raise TypeError("Inverse column mapping must already be a frozen dictionary.")
         super().__setattr__(__name, __value)
 
 
-class AbstractModel(dict, _ICrud, metaclass=ABCMeta):
+class AbstractModel(_ICrud, metaclass=ModelMetaClass):
     # _db_handler: AbstractDbHandler
     # _table_name: str
-    # _id_col_name: str
-    # _col_names: Set[str]
     # _changed_fields: List[str]
-
-    @classmethod
-    def from_dict(cls, a_dict: dict):
-        model = cls()
-        for (k, v) in a_dict.items():
-            model[k] = v
-        return model
 
     @classmethod
     def create_group(cls):
         return ModelList(cls)
 
-    def __init__(self, db_handler: AbstractDbHandler, table_name: str, column_names: Set[str], id_col_name: str = "id") -> None:
-        super().__init__()
+    def __init__(self, db_handler: AbstractDbHandler, table_name: str = None) -> None:
         if not isinstance(db_handler, AbstractDbHandler):
             raise TypeError("Invalid DB Handler for this model class.")
         self._db_handler = db_handler
-        if not isinstance(table_name, str) or len(table_name) == 0:
+        if table_name is not None and (not isinstance(table_name, str) or len(table_name) == 0):
             raise TypeError("Invalid table_name provided.")
-        self._table_name = table_name
-        if isinstance(column_names, set) and len(column_names) > 0:
-            for col_name in column_names:
-                if not isinstance(col_name, str):
-                    raise TypeError("Column names must be strings.")
-        else:
-            raise TypeError("List of one or more column names required.")
-        self._col_names = set(column_names)
-        if not isinstance(id_col_name, str) or len(id_col_name) == 0:
-            raise TypeError("Invalid id_col_name provided.")
-        self._id_col_name = id_col_name
+        self._table_name = table_name if table_name is not None else type(self).__name__
         self._changed_fields = set()
 
-    def __setitem__(self, k: str, v: Any) -> None:
-        print('changing %s to %s' % (k, str(v)))
-        if k in self._col_names:
-            self._changed_fields.add(k)
-            super().__setitem__(k, v)
+    def __new__(cls, *more):
+        """Copies new instances of the model's default column objects."""
+        instance = super().__new__(cls)
+        for name in instance.__mapping__:
+            instance.__dict__[name] = deepcopy(getattr(instance, name))
+            """Check for a column with the PrimaryKey constraint defined."""
+            if instance.__dict__[name].constraints is not None:
+                for constraint in instance.__dict__[name].constraints:
+                    if isinstance(constraint, PrimaryKey):
+                        instance.__dict__['_id'] = instance.__dict__[name]
+                        instance.__dict__['_id_col_name'] = instance.__dict__[name].column_name\
+                            if instance.__dict__[name].column_name is not None else name
+        # TODO: Refactor in a way to accommodate tables relying on sqlite's built-in `rowid` value
+        #  in lieu of a primary key
+        if not hasattr(instance, '_id'):
+            raise TypeError("Model class does not have a column defined as Primary Key.")
+        return instance
+
+    def __setattr__(self, __name, __value):
+        """Setting a new value on a TableColumn field will set the value directly to the column rather than reassign
+        the column reference."""
+        if hasattr(self, __name) and isinstance(attr := getattr(self, __name), TableColumn):
+            attr.value = __value
+            self._changed_fields.add(attr)
         else:
-            raise KeyError("Model does not contain column with name '%s'" % k)
+            super().__setattr__(__name, __value)
 
     @property
     def db_handler(self):
@@ -115,23 +119,23 @@ class AbstractModel(dict, _ICrud, metaclass=ABCMeta):
 
     @property
     def id(self):
-        return self[self._id_col_name] if self._id_col_name in self else None
+        return getattr(self, '_id')
+
+    @property
+    def id_col_name(self):
+        return getattr(self, '_id_col_name')
 
     @property
     def table_name(self):
         return self._table_name
 
-    @property
-    def id_col_name(self):
-        return self._id_col_name
-
     def delete(self) -> DbOperationResult:
-        pass
+        # TODO: Review and confirm if this still works after AbstractModel class refactor.
         if self.id is None:
             return DbOperationResult("Model is not saved and cannot be deleted. No action took place.")
         else:
             q = DeleteQueryBuilder(self._table_name)
-            q.where = where(self._id_col_name).equals(self.id)
+            q.where = where(self.id_col_name).equals(self.id.value)
             result = self._db_handler.exec_query_no_result(q)
             if isinstance(result, sqlite3.Error):
                 return DbOperationResult(error=DbOperationError(result))
@@ -144,34 +148,43 @@ class AbstractModel(dict, _ICrud, metaclass=ABCMeta):
         pass
 
     def save(self, update_existing: bool = True) -> DbOperationResult:
+        # TODO: Review and confirm if this still works after AbstractModel class refactor.
         if self.id is None:
-            q = InsertQueryBuilder(self._table_name).set_value(self)
+            q = InsertQueryBuilder(self._table_name).set_value(self._get_value_map())
             action = 'Insert'
+            # TODO: Retrieve and update the self.id value after insertion.
         else:
-            q = UpdateQueryBuilder(self._table_name).set_value(self)
-            q.where = where(self._id_col_name).equals(self.id)
+            q = UpdateQueryBuilder(self._table_name).set_value(self._get_value_map(True))
+            q.where = where(self.id_col_name).equals(self.id.value)
             action = 'Update'
         result = self._db_handler.exec_query_single_result(q)
         return DbOperationResult('%s operation %s' % (action, 'success' if result.success else 'failure'),
                                  [result.row], DbOperationError(result.error) if result.error is not None else None)
 
-    def _set_if_tag_exists(self, field_name, source, source_field=None) -> None:
-        if source_field is None:
-            source_field = field_name
-        if source[source_field] is not None:
-            self[field_name] = source[source_field][0] if isinstance(source[source_field], list)\
-                else source[source_field]
+    def _get_value_map(self, only_updated_fields: bool = False) -> List[Dict[str, Any], ...]:
+        value_map = []
+        for class_field_name, column_name in self.__mapping__.items():
+            attr = getattr(self, class_field_name)
+            if not only_updated_fields or attr not in self._changed_fields:
+                continue
+            value_map.append({column_name: attr.value})
+        return value_map
 
-    @abstractmethod
-    def populate(self, taglib_song) -> None:
-        pass
+    def populate(self, columns_and_values: Dict[str, Any]) -> None:
+        for column_name, value in columns_and_values.items():
+            if column_name not in self.__mapping_inverse__:
+                raise AttributeError(f"No column mapping exists for column {column_name}.")
+            getattr(self, self.__mapping_inverse__[column_name]).value = value
 
-    def from_sqlite(self, row: sqlite3.Row, sqlite_field_mapping=None) -> None:
-        for sql_key in row.keys():
-            key = sqlite_field_mapping[sql_key]\
-                if sqlite_field_mapping is not None and sql_key in sqlite_field_mapping\
-                else sql_key
-            self[key] = row[sql_key]
+    def from_sqlite(self, row: sqlite3.Row) -> None:
+        # TODO: Test that this works the same as feeding a dict into self.populate;
+        #  Remove this method and add sqlite3.Row to the type hint of self.populate if so.
+        self.populate(row)
+        # for sql_key in row.keys():
+        #     key = sqlite_field_mapping[sql_key]\
+        #         if sqlite_field_mapping is not None and sql_key in sqlite_field_mapping\
+        #         else sql_key
+        #     self[key] = row[sql_key]
 
 
 ModelType = TypeVar('ModelType', bound=AbstractModel)
