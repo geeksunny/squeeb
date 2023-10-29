@@ -3,20 +3,20 @@ from __future__ import annotations
 from typing import List
 
 import squeeb
+from squeeb.db import register_db_handler
 from squeeb.model import column, DataType, PrimaryKey, ForeignKey
+from squeeb.model.models import table
 
 
 
 
+@table
 class Artist(squeeb.AbstractModel):
     id = column(DataType.INTEGER, constraints=PrimaryKey(autoincrement=True, unique=True))
     spotify_id = column(DataType.TEXT)
     name = column(DataType.TEXT)
     spotify_genres = column(DataType.TEXT)
     spotify_popularity = column(DataType.INTEGER)
-
-    def __init__(self) -> None:
-        super().__init__(db, "artists")
 
     # def needs_split(self) -> bool:
     #     return 'album_artist' in self
@@ -28,6 +28,7 @@ class Artist(squeeb.AbstractModel):
     #     return album_artist
 
 
+@table
 class Album(squeeb.AbstractModel):
     id = column(DataType.INTEGER, constraints=PrimaryKey(autoincrement=True))
     spotify_id = column(DataType.TEXT)
@@ -37,10 +38,8 @@ class Album(squeeb.AbstractModel):
     artist_id = column(DataType.INTEGER, constraints=ForeignKey(Artist, 'id'))
     spotify_genres = column(DataType.TEXT)
 
-    def __init__(self) -> None:
-        super().__init__(db, "albums")
 
-
+@table
 class Track(squeeb.AbstractModel):
     id = column(DataType.INTEGER, constraints=PrimaryKey(autoincrement=True))
     spotify_id = column(DataType.TEXT)
@@ -62,9 +61,6 @@ class Track(squeeb.AbstractModel):
     tempo = column(DataType.REAL)
     time_signature = column(DataType.INTEGER)
     valence = column(DataType.REAL)
-
-    def __init__(self) -> None:
-        super().__init__(db, "tracks")
 
 
 class _MusicDb(squeeb.AbstractDbHandler):
@@ -147,6 +143,7 @@ class _MusicDb(squeeb.AbstractDbHandler):
 
 # Singleton instance of the db handler
 db = _MusicDb()
+register_db_handler(db)
 
 # artist = Artist.from_dict({"name": 1})
 # album = Album.from_dict({"name": "cool"})

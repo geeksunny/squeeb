@@ -5,11 +5,12 @@ from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
 from types import MappingProxyType as FrozenDict
-from typing import Type, Dict, Any, TypeVar, Set, List, ClassVar
+from typing import Type, Dict, Any, TypeVar, List, ClassVar
 
-from squeeb.db import AbstractDbHandler
+from squeeb.db import AbstractDbHandler, _get_db_handler
 from squeeb.query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
 from .columns import TableColumn, PrimaryKey
+from squeeb.util import camel_to_snake_case
 
 
 class DbOperationError(Exception):
@@ -69,24 +70,17 @@ class ModelMetaClass(ABCMeta):
 
 
 class AbstractModel(_ICrud, metaclass=ModelMetaClass):
-    # _db_handler: AbstractDbHandler
-    # _table_name: str
     # _changed_fields: List[str]
 
     __mapping__: ClassVar[Dict[str, str]]
     __mapping_inverse__: ClassVar[Dict[str, str]]
+    _db_handler: ClassVar[AbstractDbHandler]
 
     @classmethod
     def create_group(cls):
         return ModelList(cls)
 
-    def __init__(self, db_handler: AbstractDbHandler, table_name: str = None) -> None:
-        if not isinstance(db_handler, AbstractDbHandler):
-            raise TypeError("Invalid DB Handler for this model class.")
-        self._db_handler = db_handler
-        if table_name is not None and (not isinstance(table_name, str) or len(table_name) == 0):
-            raise TypeError("Invalid table_name provided.")
-        self._table_name = table_name if table_name is not None else type(self).__name__
+    def __init__(self) -> None:
         self._changed_fields = set()
 
     def __new__(cls, *more):
@@ -117,8 +111,9 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
             super().__setattr__(__name, __value)
 
     @property
-    def db_handler(self):
-        return self._db_handler
+    @abstractmethod
+    def db_handler(self) -> AbstractDbHandler:
+        pass
 
     @property
     def id(self):
@@ -129,8 +124,9 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
         return getattr(self, '_id_col_name')
 
     @property
-    def table_name(self):
-        return self._table_name
+    @abstractmethod
+    def table_name(self) -> str:
+        pass
 
     def delete(self) -> DbOperationResult:
         # TODO: Review and confirm if this still works after AbstractModel class refactor.
@@ -153,11 +149,11 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
     def save(self, update_existing: bool = True) -> DbOperationResult:
         # TODO: Review and confirm if this still works after AbstractModel class refactor.
         if self.id.value is None:
-            q = InsertQueryBuilder(self._table_name).set_value(self._get_value_map())
+            q = InsertQueryBuilder(self.table_name).set_value(self._get_value_map())
             action = 'Insert'
             # TODO: Retrieve and update the self.id value after insertion.
         else:
-            q = UpdateQueryBuilder(self._table_name).set_value(self._get_value_map(True))
+            q = UpdateQueryBuilder(self.table_name).set_value(self._get_value_map(True))
             q.where = where(self.id_col_name).equals(self.id.value)
             action = 'Update'
         result = self._db_handler.exec_query_single_result(q)
@@ -191,6 +187,47 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
 
 
 ModelType = TypeVar('ModelType', bound=AbstractModel)
+
+
+def table(cls: Type[AbstractModel] = None, db_handler_name: str = 'default', table_name: str = None):
+    """
+    Decorates an AbstractModel subclass to wire up internal dependencies.
+    :param cls: The class being generated. This is passed automatically and can be ignored.
+    :param db_handler_name: The name of a DbHandler that's been registered with `register_db_handler(db_handler, name)`.
+           This uses the default handler if no name is passed.
+    :param table_name: The table name that this model will be represented as in the database.
+           The name will default to an all lower-case snake-cased pluralized version of your models name.
+           For example: A model class named 'ItemRecord' will become 'item_records'.
+    :return: A wrapped subclass of your decorated class definition.
+    """
+    if not isinstance(db_handler_name, str):
+        raise TypeError("Database handler name must be a string.")
+    if table_name is not None and (not isinstance(table_name, str) or len(table_name) == 0):
+        raise TypeError("Invalid table_name provided.")
+
+    def wrap(clss):
+        _table_name = table_name if table_name is not None else f'{camel_to_snake_case(clss.__name__, lowercase=True)}s'
+
+        class TableClass(clss):
+
+            def __init__(self) -> None:
+                self._db_handler = _get_db_handler()
+                if self._db_handler is None:
+                    raise ValueError("Database handler for this model has not been registered.")
+                super().__init__()
+
+            @property
+            def db_handler(self) -> AbstractDbHandler:
+                return self._db_handler
+
+            @property
+            def table_name(self) -> str:
+                return _table_name
+
+        TableClass.__name__ = TableClass.__qualname__ = clss.__name__
+        return TableClass
+
+    return wrap if cls is None else wrap(cls)
 
 
 @dataclass(frozen=True)

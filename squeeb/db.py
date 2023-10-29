@@ -5,7 +5,7 @@ import sqlite3
 from abc import ABCMeta, abstractmethod
 from contextlib import closing
 from dataclasses import dataclass
-from typing import Any, List, Tuple, TypeVar
+from typing import Any, List, Tuple, TypeVar, Dict
 
 from .query import AbstractQueryBuilder
 
@@ -44,7 +44,6 @@ logger = logging.getLogger()
 
 
 class AbstractDbHandler(object, metaclass=ABCMeta):
-
     _conn = None
 
     def __init__(self) -> None:
@@ -128,3 +127,14 @@ class AbstractDbHandler(object, metaclass=ABCMeta):
         if self._conn is not None:
             self._conn.close()
             self._conn = None
+
+
+__db_handlers: Dict[str, AbstractDbHandler] = {}
+
+
+def register_db_handler(db_handler: AbstractDbHandler, name: str = 'default'):
+    __db_handlers[name] = db_handler
+
+
+def _get_db_handler(name: str = 'default') -> AbstractDbHandler:
+    return __db_handlers[name] if name in __db_handlers else None
