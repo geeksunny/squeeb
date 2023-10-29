@@ -3,71 +3,68 @@ from __future__ import annotations
 from typing import List
 
 import squeeb
-
-# TODO: Convert these fields into TableColumn definitions on each model for testing.
-# _track_fields = {'id', 'spotify_id', 'filepath', 'name', 'duration', 'artist_id', 'album_artist_id', 'album_id',
-#                  'album_track_number', 'danceability', 'energy', 'instrumentalness', 'key', 'liveness', 'loudness',
-#                  'mode', 'speechiness', 'tempo', 'time_signature', 'valence'}
-# _artist_fields = {'id', 'spotify_id', 'name', 'spotify_genres', 'spotify_popularity'}
-# _album_fields = {'id', 'spotify_id', 'name', 'year', 'genres', 'artist_id', 'spotify_genres'}
+from squeeb.model import column, DataType, PrimaryKey, ForeignKey
 
 
-class Track(squeeb.AbstractModel):
-
-    def __init__(self) -> None:
-        super().__init__(db, "tracks")
-
-    def populate(self, taglib_song) -> None:
-        self['filepath'] = taglib_song.path
-        self['duration'] = taglib_song.length
-        self._set_if_tag_exists('name', taglib_song, 'TITLE')
-        self._set_if_tag_exists('album_track_number', taglib_song, 'TRACKNUMBER')
-
-    def set_artist(self, artist):
-        if 'id' in artist:
-            self['artist_id'] = artist['id']
-
-    def set_album_artist(self, artist):
-        if 'id' in artist:
-            self['album_artist_id'] = artist['id']
-
-    def set_album(self, album):
-        if 'id' in album:
-            self['album_id'] = album['id']
 
 
 class Artist(squeeb.AbstractModel):
+    id = column(DataType.INTEGER, constraints=PrimaryKey(autoincrement=True, unique=True))
+    spotify_id = column(DataType.TEXT)
+    name = column(DataType.TEXT)
+    spotify_genres = column(DataType.TEXT)
+    spotify_popularity = column(DataType.INTEGER)
 
     def __init__(self) -> None:
         super().__init__(db, "artists")
 
-    def populate(self, taglib_song) -> None:
-        self._set_if_tag_exists('name', taglib_song, 'ARTIST')
-        self._set_if_tag_exists('album_artist', taglib_song, 'ALBUMARTIST')
-
-    def needs_split(self) -> bool:
-        return 'album_artist' in self
-
-    def split(self) -> Artist:
-        album_artist = Artist()
-        album_artist['name'] = self['album_artist']
-        del self['album_artist']
-        return album_artist
+    # def needs_split(self) -> bool:
+    #     return 'album_artist' in self
+    #
+    # def split(self) -> Artist:
+    #     album_artist = Artist()
+    #     album_artist['name'] = self['album_artist']
+    #     del self['album_artist']
+    #     return album_artist
 
 
 class Album(squeeb.AbstractModel):
+    id = column(DataType.INTEGER, constraints=PrimaryKey(autoincrement=True))
+    spotify_id = column(DataType.TEXT)
+    name = column(DataType.TEXT)
+    year = column(DataType.INTEGER)
+    genres = column(DataType.TEXT)
+    artist_id = column(DataType.INTEGER, constraints=ForeignKey(Artist, 'id'))
+    spotify_genres = column(DataType.TEXT)
 
     def __init__(self) -> None:
         super().__init__(db, "albums")
 
-    def populate(self, taglib_song) -> None:
-        # todo: genres field... array of all genres in tracks?
-        self._set_if_tag_exists('name', taglib_song, 'ALBUM')
-        self._set_if_tag_exists('album_artist', taglib_song, 'ALBUMARTIST')
 
-    def set_artist(self, artist):
-        if 'id' in artist:
-            self['artist_id'] = artist['id']
+class Track(squeeb.AbstractModel):
+    id = column(DataType.INTEGER, constraints=PrimaryKey(autoincrement=True))
+    spotify_id = column(DataType.TEXT)
+    filepath = column(DataType.TEXT)
+    name = column(DataType.TEXT)
+    duration = column(DataType.INTEGER)
+    artist_id = column(DataType.INTEGER, constraints=ForeignKey(Artist, 'id'))
+    album_artist_id = column(DataType.INTEGER, constraints=ForeignKey(Artist, 'id'))
+    album_id = column(DataType.INTEGER, constraints=ForeignKey(Album, 'id'))
+    album_track_number = column(DataType.INTEGER)
+    danceability = column(DataType.REAL)
+    energy = column(DataType.REAL)
+    instrumentalness = column(DataType.REAL)
+    key = column(DataType.INTEGER)
+    liveness = column(DataType.REAL)
+    loudness = column(DataType.REAL)
+    mode = column(DataType.INTEGER)
+    speechiness = column(DataType.REAL)
+    tempo = column(DataType.REAL)
+    time_signature = column(DataType.INTEGER)
+    valence = column(DataType.REAL)
+
+    def __init__(self) -> None:
+        super().__init__(db, "tracks")
 
 
 class _MusicDb(squeeb.AbstractDbHandler):
