@@ -35,6 +35,7 @@ class PrimaryKey(ColumnConstraint):
     order: Order = None
     conflict_clause: ConflictClause = None
     autoincrement: bool = False
+    unique: bool = False
 
     def __str__(self) -> str:
         output = ['PRIMARY KEY']
@@ -44,6 +45,8 @@ class PrimaryKey(ColumnConstraint):
             output.append(self.conflict_clause)
         if self.autoincrement is True:
             output.append('AUTOINCREMENT')
+        if self.unique is True:
+            output.append('UNIQUE')
         return ' '.join(output)
 
 
@@ -135,6 +138,9 @@ class DefaultExpression(DefaultValue):
 class TableColumn(metaclass=ABCMeta):
     value: Any
 
+    def __hash__(self):
+        return hash((self.column_name, self.data_type, self.constraints, self.value))
+
     @property
     @abstractmethod
     def column_name(self):
@@ -154,7 +160,8 @@ class TableColumn(metaclass=ABCMeta):
 __column_classes: Dict[Tuple[DataType, str, Tuple[ColumnConstraint, ...]], Type[TableColumn]] = {}
 
 
-def column(data_type: DataType, value: Any = None, column_name: str = None, constraints: Tuple[ColumnConstraint, ...] = None):
+def column(data_type: DataType, value: Any = None, column_name: str = None,
+           constraints: Tuple[ColumnConstraint, ...] | ColumnConstraint = None):
     """
     Creates a TableColumnClass with the given parameters. Stores the created class for repeat use.
     :param data_type: Data type of the table column.
@@ -162,8 +169,11 @@ def column(data_type: DataType, value: Any = None, column_name: str = None, cons
     :param column_name: Sqlite column name that this field will map to.
            If `None` is provided, the model's member variable name will be used.
     :param constraints: Optional tuple of ColumnConstraint objects to attach to this column.
+           May also provide a single ColumnConstraint object.
     :return: An instance of the resulting TableColumnClass.
     """
+    if not isinstance(constraints, tuple):
+        constraints = (constraints, )
     if (data_type, column_name, constraints) in __column_classes:
         column_class = __column_classes[(data_type, column_name, constraints)]
     else:

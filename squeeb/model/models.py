@@ -5,7 +5,7 @@ from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
 from types import MappingProxyType as FrozenDict
-from typing import Type, Dict, Any, TypeVar, Set, List
+from typing import Type, Dict, Any, TypeVar, Set, List, ClassVar
 
 from squeeb.db import AbstractDbHandler
 from squeeb.query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
@@ -72,6 +72,9 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
     # _db_handler: AbstractDbHandler
     # _table_name: str
     # _changed_fields: List[str]
+
+    __mapping__: ClassVar[Dict[str, str]]
+    __mapping_inverse__: ClassVar[Dict[str, str]]
 
     @classmethod
     def create_group(cls):
@@ -149,7 +152,7 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
 
     def save(self, update_existing: bool = True) -> DbOperationResult:
         # TODO: Review and confirm if this still works after AbstractModel class refactor.
-        if self.id is None:
+        if self.id.value is None:
             q = InsertQueryBuilder(self._table_name).set_value(self._get_value_map())
             action = 'Insert'
             # TODO: Retrieve and update the self.id value after insertion.

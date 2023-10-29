@@ -86,7 +86,7 @@ class AbstractQueryBuilder(object, metaclass=ABCMeta):
         query_args = []
         for arg in q_args:
             if isinstance(arg, _QueryArgs):
-                args_part = f_map[arg].value_args if arg in f_map and f_map[arg] is not None else None
+                args_part = list(f_map[arg].value_args) if arg in f_map and f_map[arg] is not None else None
                 if args_part is None or len(args_part) == 0:
                     continue  # Skip
                 query_args.extend(args_part)
