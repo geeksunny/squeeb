@@ -188,7 +188,7 @@ class DeleteQueryBuilder(AbstractQueryBuilder):
 
 
 def where(*args) -> MutableQueryCondition:
-    if len(args) == 1 and type(args[0] is str):
+    if len(args) == 1 and type(args[0]) is str:
         return MutableQueryCondition(args[0])
     elif len(args) > 1:
         pass

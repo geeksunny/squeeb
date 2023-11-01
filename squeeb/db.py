@@ -90,23 +90,23 @@ class AbstractDbHandler(object, metaclass=ABCMeta):
     def exec_query_no_result(self, query_builder: QueryBuilder) -> DbHandlerNoResult:
         query = query_builder.build()
         if 'error' in query:
-            logger.error('QUERY BUILD ERROR: %s', query['error'])
-            return DbHandlerNoResult(error=query['error'])
-        return self._exec_raw_query_no_result(query['query'], query['args'])
+            logger.error('QUERY BUILD ERROR: %s', query.error)
+            return DbHandlerNoResult(error=query.error)
+        return self._exec_raw_query_no_result(query.query, query.args)
 
     def exec_query_single_result(self, query_builder: QueryBuilder) -> DbHandlerSingleResult:
         query = query_builder.build()
         if 'error' in query:
-            logger.error('QUERY BUILD ERROR: %s', query['error'])
-            return DbHandlerSingleResult(error=query['error'])
-        return self._exec_raw_query_single_result(query['query'], query['args'])
+            logger.error('QUERY BUILD ERROR: %s', query.error)
+            return DbHandlerSingleResult(error=query.error)
+        return self._exec_raw_query_single_result(query.query, query.args)
 
     def exec_query_all_results(self, query_builder: QueryBuilder) -> DbHandlerMultiResult:
         query = query_builder.build()
         if 'error' in query:
-            logger.error('QUERY BUILD ERROR: %s', query['error'])
-            return DbHandlerMultiResult(error=query['error'])
-        return self._exec_raw_query_all_results(query['query'], query['args'])
+            logger.error('QUERY BUILD ERROR: %s', query.error)
+            return DbHandlerMultiResult(error=query.error)
+        return self._exec_raw_query_all_results(query.query, query.args)
 
     def exec_many_no_result(self, query_builder: QueryBuilder) -> List[DbHandlerNoResult]:
         pass
