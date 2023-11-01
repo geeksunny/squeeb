@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType as FrozenDict
 from typing import Type, Dict, Any, TypeVar, List, ClassVar
 
-from squeeb.db import AbstractDbHandler, _get_db_handler
+from squeeb.db import DbHandler, _get_db_handler
 from squeeb.query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
 from .columns import TableColumn, PrimaryKey
 from squeeb.util import camel_to_snake_case
@@ -74,7 +74,7 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
 
     __mapping__: ClassVar[Dict[str, str]]
     __mapping_inverse__: ClassVar[Dict[str, str]]
-    _db_handler: ClassVar[AbstractDbHandler]
+    _db_handler: ClassVar[DbHandler]
 
     @classmethod
     def create_group(cls):
@@ -112,7 +112,7 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
 
     @property
     @abstractmethod
-    def db_handler(self) -> AbstractDbHandler:
+    def db_handler(self) -> DbHandler:
         pass
 
     @property
@@ -217,7 +217,7 @@ def table(cls: Type[AbstractModel] = None, db_handler_name: str = 'default', tab
                 super().__init__()
 
             @property
-            def db_handler(self) -> AbstractDbHandler:
+            def db_handler(self) -> DbHandler:
                 return self._db_handler
 
             @property

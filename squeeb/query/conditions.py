@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from enum import StrEnum
-from typing import List, Iterable, Union, Any
+from typing import List, Iterable, Union, Any, Self
 
 from squeeb.query._queries import Operator
 from squeeb.query.values import _QueryValueHandlerMixin, QueryValues
@@ -165,7 +165,7 @@ class _BaseQueryConditionSequence(_IQueryCondition):
 class QueryConditionSequence(_BaseQueryConditionSequence, _IQueryJuncture):
 
     @property
-    def and_(self) -> _BaseQueryConditionSequence:
+    def and_(self) -> Self:
         if not self.is_ready_for_condition():
             self._conditions.append(Junction.AND)
             return self
@@ -173,7 +173,7 @@ class QueryConditionSequence(_BaseQueryConditionSequence, _IQueryJuncture):
             raise QueryConditionError("Condition sequence out of order.")
 
     @property
-    def or_(self) -> _BaseQueryConditionSequence:
+    def or_(self) -> Self:
         if not self.is_ready_for_condition():
             self._conditions.append(Junction.OR)
             return self

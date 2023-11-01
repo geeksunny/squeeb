@@ -4,7 +4,7 @@ import string
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Tuple, Union, Any, Dict, List
+from typing import Tuple, Union, Any, Dict, List, TypeVar, Self
 
 from squeeb.query.conditions import _IQueryCondition, QueryConditionSequence, QueryConditionGroup, \
     MutableQueryCondition, QueryCondition
@@ -56,7 +56,7 @@ class AbstractQueryBuilder(object, metaclass=ABCMeta):
     def _get_args_needed(self) -> Tuple[_QueryArgs]:
         pass
 
-    def set_value(self, value_obj: Union[Dict[str, Any], List[Dict[str, Any]]]) -> AbstractQueryBuilder:
+    def set_value(self, value_obj: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Self:
         if isinstance(value_obj, list):
             self._value_map = _QueryValueMapGroup.create(value_obj)
         else:
@@ -95,6 +95,9 @@ class AbstractQueryBuilder(object, metaclass=ABCMeta):
     def build(self) -> Query:
         return Query(self._get_query_str(), self._get_args(self._get_args_needed())) if self._table_name is not None\
             else Query(error="No table name provided.")
+
+
+QueryBuilder = TypeVar("QueryBuilder", bound=AbstractQueryBuilder)
 
 
 class CreateIndexQueryBuilder(AbstractQueryBuilder):

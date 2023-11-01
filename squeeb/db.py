@@ -5,11 +5,9 @@ import sqlite3
 from abc import ABCMeta, abstractmethod
 from contextlib import closing
 from dataclasses import dataclass
-from typing import Any, List, Tuple, TypeVar, Dict
+from typing import Any, List, Tuple, Dict, TypeVar
 
-from .query import AbstractQueryBuilder
-
-QueryBuilder = TypeVar("QueryBuilder", bound=AbstractQueryBuilder)
+from .query.queries import QueryBuilder
 
 
 class BaseDbHandlerResult:
@@ -129,12 +127,15 @@ class AbstractDbHandler(object, metaclass=ABCMeta):
             self._conn = None
 
 
-__db_handlers: Dict[str, AbstractDbHandler] = {}
+DbHandler = TypeVar('DbHandler', bound=AbstractDbHandler)
 
 
-def register_db_handler(db_handler: AbstractDbHandler, name: str = 'default'):
+__db_handlers: Dict[str, DbHandler] = {}
+
+
+def register_db_handler(db_handler: DbHandler, name: str = 'default'):
     __db_handlers[name] = db_handler
 
 
-def _get_db_handler(name: str = 'default') -> AbstractDbHandler:
+def _get_db_handler(name: str = 'default') -> DbHandler:
     return __db_handlers[name] if name in __db_handlers else None
