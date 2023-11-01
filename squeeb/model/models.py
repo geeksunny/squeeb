@@ -5,12 +5,13 @@ from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
 from types import MappingProxyType as FrozenDict
-from typing import Type, Dict, Any, TypeVar, List, ClassVar
+from typing import Type, Dict, TypeVar, List, ClassVar
 
 from squeeb.db import DbHandler, _get_db_handler
 from squeeb.query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
 from .columns import TableColumn, PrimaryKey
 from squeeb.util import camel_to_snake_case
+from squeeb.common import ValueMapping
 
 
 class DbOperationError(Exception):
@@ -160,7 +161,7 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
         return DbOperationResult('%s operation %s' % (action, 'success' if result.success else 'failure'),
                                  [result.row], DbOperationError(result.error) if result.error is not None else None)
 
-    def _get_value_map(self, only_updated_fields: bool = False) -> List[Dict[str, Any], ...]:
+    def _get_value_map(self, only_updated_fields: bool = False) -> List[ValueMapping]:
         value_map = []
         for class_field_name, column_name in self.__mapping__.items():
             attr = getattr(self, class_field_name)
@@ -169,7 +170,7 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
             value_map.append({column_name: attr.value})
         return value_map
 
-    def populate(self, columns_and_values: Dict[str, Any]) -> None:
+    def populate(self, columns_and_values: ValueMapping) -> None:
         for column_name, value in columns_and_values.items():
             if column_name not in self.__mapping_inverse__:
                 raise AttributeError(f"No column mapping exists for column {column_name}.")

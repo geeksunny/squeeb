@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
 from enum import StrEnum
-from typing import List, Iterable, Union, Any, Self
+from typing import List, Iterable, Any, Self
 
 from squeeb.query._queries import Operator
 from squeeb.query.values import _QueryValueHandlerMixin, QueryValues
@@ -38,10 +38,10 @@ class _IQueryJuncture(object, metaclass=ABCMeta):
 class _BaseQueryCondition(_IQueryCondition):
 
     _column_name: str = None
-    _value: Union[Any, List[Any]] = None
+    _value: Any | List[Any] = None
     _operator: Operator = Operator.EQUALS
 
-    def __init__(self, column_name_or_condition: Union[str, _BaseQueryCondition] = None,
+    def __init__(self, column_name_or_condition: str | _BaseQueryCondition = None,
                  value: Any = None,
                  operator: Operator = None) -> None:
         if column_name_or_condition is not None and isinstance(column_name_or_condition, _BaseQueryCondition):
@@ -126,7 +126,7 @@ class MutableQueryCondition(_BaseQueryCondition, _MutableConditionMixin):
 
 class _BaseQueryConditionSequence(_IQueryCondition):
 
-    _conditions: List[Union[_IQueryCondition, Junction]] = []
+    _conditions: List[_IQueryCondition | Junction] = []
 
     def __init__(self, first_condition_or_sequence: Union[_IQueryCondition, _BaseQueryConditionSequence],
                  first_junction: Junction = None) -> None:

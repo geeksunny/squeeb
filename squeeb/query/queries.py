@@ -4,8 +4,9 @@ import string
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Tuple, Union, Any, Dict, List, TypeVar, Self
+from typing import Tuple, Any, List, TypeVar, Self
 
+from squeeb.common import ValueMapping
 from squeeb.query.conditions import _IQueryCondition, QueryConditionSequence, QueryConditionGroup, \
     MutableQueryCondition, QueryCondition
 from squeeb.query.values import _QueryValueMap, _QueryValueMapGroup
@@ -15,7 +16,7 @@ from squeeb.query.values import _QueryValueMap, _QueryValueMapGroup
 class Query:
     query: str = None
     args: Tuple[Any, ...] = None
-    error: Union[str, Exception] = None
+    error: str | Exception = None
 
 
 
@@ -27,13 +28,13 @@ class _QueryArgs(Enum):
 class AbstractQueryBuilder(object, metaclass=ABCMeta):
 
     _table_name: str = None
-    _value_map: Union[_QueryValueMap, _QueryValueMapGroup] = None
+    _value_map: _QueryValueMap | _QueryValueMapGroup = None
     _where_conditions: _IQueryCondition = None
 
     def __init__(self,
                  table_name: str,
-                 value_map: Union[Dict[str, Any], List[Dict[str, Any]]] = None,
-                 where_condition: Union[QueryCondition, QueryConditionSequence, QueryConditionGroup] = None) -> None:
+                 value_map: ValueMapping | List[ValueMapping] = None,
+                 where_condition: QueryCondition | QueryConditionSequence | QueryConditionGroup = None) -> None:
         super().__init__()
         self._table_name = table_name
         if value_map is not None:
@@ -56,7 +57,7 @@ class AbstractQueryBuilder(object, metaclass=ABCMeta):
     def _get_args_needed(self) -> Tuple[_QueryArgs]:
         pass
 
-    def set_value(self, value_obj: Union[Dict[str, Any], List[Dict[str, Any]]]) -> Self:
+    def set_value(self, value_obj: ValueMapping | List[ValueMapping]) -> Self:
         if isinstance(value_obj, list):
             self._value_map = _QueryValueMapGroup.create(value_obj)
         else:

@@ -3,6 +3,8 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod
 from typing import TypeVar, Dict, Tuple, Any, Iterable, List, Generator
 
+from squeeb.common import ValueMapping
+
 
 QueryValues = TypeVar('QueryValues', Tuple[Any, ...], Generator[Tuple[Any, ...], None, None])
 
@@ -33,7 +35,7 @@ class _IQueryValueStrings(object, metaclass=ABCMeta):
 
 class _QueryValueMap(dict, _QueryValueHandlerMixin, _IQueryValueStrings):
 
-    def __init__(self, values: Dict[str, Any]) -> None:
+    def __init__(self, values: ValueMapping) -> None:
         super().__init__()
         self.update(values)
 
@@ -58,7 +60,7 @@ class _QueryValueMapGroup(_QueryValueHandlerMixin, _IQueryValueStrings):
     _value_maps: List[_QueryValueMap] = []
 
     @staticmethod
-    def create(value_maps: Iterable[Dict[str, Any]]) -> _QueryValueMapGroup:
+    def create(value_maps: Iterable[ValueMapping]) -> _QueryValueMapGroup:
         query_value_maps = []
         for value_map in value_maps:
             query_value_maps.append(_QueryValueMap(value_map))
