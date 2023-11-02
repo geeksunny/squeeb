@@ -7,11 +7,12 @@ from dataclasses import dataclass, field
 from types import MappingProxyType as FrozenDict
 from typing import Type, Dict, TypeVar, List, ClassVar
 
-from squeeb.db import DbHandler, _get_db_handler
+from squeeb.db import DbHandler, _get_db_handler, AbstractDbHandler
 from squeeb.query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
 from .columns import TableColumn, PrimaryKey
 from squeeb.util import camel_to_snake_case
 from squeeb.common import ValueMapping
+from squeeb.query.queries import CreateTableQueryBuilder
 
 
 class DbOperationError(Exception):
@@ -75,7 +76,8 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
 
     __mapping__: ClassVar[Dict[str, str]]
     __mapping_inverse__: ClassVar[Dict[str, str]]
-    _db_handler: ClassVar[DbHandler]
+    _db_handler: ClassVar[AbstractDbHandler]
+    _table_name: ClassVar[str]
 
     @classmethod
     def create_group(cls):
@@ -94,7 +96,7 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
                 for constraint in instance.__dict__[name].constraints:
                     if isinstance(constraint, PrimaryKey):
                         instance.__dict__['_id'] = instance.__dict__[name]
-                        instance.__dict__['_id_col_name'] = instance.__dict__[name].column_name\
+                        instance.__dict__['_id_col_name'] = instance.__dict__[name].column_name \
                             if instance.__dict__[name].column_name is not None else name
         # TODO: Refactor in a way to accommodate tables relying on sqlite's built-in `rowid` value
         #  in lieu of a primary key
@@ -111,10 +113,13 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
         else:
             super().__setattr__(__name, __value)
 
-    @property
-    @abstractmethod
-    def db_handler(self) -> DbHandler:
+    @classmethod
+    def _create_table_query(cls) -> CreateTableQueryBuilder:
         pass
+
+    @property
+    def db_handler(self) -> DbHandler:
+        return self._db_handler
 
     @property
     def id(self):
@@ -125,9 +130,8 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
         return getattr(self, '_id_col_name')
 
     @property
-    @abstractmethod
     def table_name(self) -> str:
-        pass
+        return self._table_name
 
     def delete(self) -> DbOperationResult:
         # TODO: Review and confirm if this still works after AbstractModel class refactor.
@@ -201,8 +205,10 @@ def table(cls: Type[AbstractModel] = None, db_handler_name: str = 'default', tab
            For example: A model class named 'ItemRecord' will become 'item_records'.
     :return: A wrapped subclass of your decorated class definition.
     """
+    if cls is not None and not issubclass(cls, AbstractModel):
+        raise TypeError("Decorated class must be a subclass of AbstractModel.")
     if not isinstance(db_handler_name, str):
-        raise TypeError("Database handler name must be a string.")
+        raise TypeError("Database handler name must be a string value.")
     if table_name is not None and (not isinstance(table_name, str) or len(table_name) == 0):
         raise TypeError("Invalid table_name provided.")
 
@@ -212,20 +218,14 @@ def table(cls: Type[AbstractModel] = None, db_handler_name: str = 'default', tab
         class TableClass(clss):
 
             def __init__(self) -> None:
-                self._db_handler = _get_db_handler()
-                if self._db_handler is None:
-                    raise ValueError("Database handler for this model has not been registered.")
+                if not hasattr(self.__class__, '_db_handler') or self.__class__._db_handler is None:
+                    self.__class__._db_handler = _get_db_handler()
+                    if self.__class__._db_handler is None:
+                        raise ValueError("Database handler for this model has not been registered.")
                 super().__init__()
 
-            @property
-            def db_handler(self) -> DbHandler:
-                return self._db_handler
-
-            @property
-            def table_name(self) -> str:
-                return _table_name
-
         TableClass.__name__ = TableClass.__qualname__ = clss.__name__
+        TableClass._table_name = _table_name
         return TableClass
 
     return wrap if cls is None else wrap(cls)
