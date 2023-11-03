@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta, abstractmethod, ABC
 from dataclasses import dataclass, InitVar, field
 from enum import StrEnum
 from typing import Any, Tuple, Dict, Type
@@ -83,25 +83,33 @@ class ForeignKey(ColumnConstraint):
 
 
 @dataclass(frozen=True)
-class NotNull(ColumnConstraint):
+class ConflictClauseConstraint(ColumnConstraint, ABC):
     conflict_clause: ConflictClause = None
 
+    @property
+    @abstractmethod
+    def keyword(self):
+        pass
+
     def __str__(self) -> str:
-        output = ['NOT NULL']
+        output = [self.keyword]
         if self.conflict_clause is not None:
             output.append(self.conflict_clause)
         return ' '.join(output)
 
 
-@dataclass(frozen=True)
-class Unique(ColumnConstraint):
-    conflict_clause: ConflictClause = None
+class NotNull(ConflictClauseConstraint):
 
-    def __str__(self) -> str:
-        output = ['UNIQUE']
-        if self.conflict_clause is not None:
-            output.append(self.conflict_clause)
-        return ' '.join(output)
+    @property
+    def keyword(self):
+        return 'NOT NULL'
+
+
+class Unique(ConflictClauseConstraint):
+
+    @property
+    def keyword(self):
+        return 'UNIQUE'
 
 
 class CollateSequence(StrEnum):
