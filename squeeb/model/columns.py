@@ -1,5 +1,7 @@
+from __future__ import annotations
+
 from abc import ABCMeta, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, InitVar, field
 from enum import StrEnum
 from typing import Any, Tuple, Dict, Type
 
@@ -60,14 +62,19 @@ class KeyAction(StrEnum):
 
 @dataclass(frozen=True)
 class ForeignKey(ColumnConstraint):
-    foreign_table: Any  # TODO: Refactor this to use AbstractModel once circular import can be addressed
-    foreign_column: str
+    foreign_table_class: Any  # TODO: Refactor this to use AbstractModel once circular import can be addressed
+    foreign_table_column: InitVar[TableColumn]
+    foreign_column_name: str = field(init=False)
+
     on_delete_action: KeyAction = None
     on_update_action: KeyAction = None
     # todo: match [name], [not] deferrable [initially [deferred / immediate]]
 
+    def __post_init__(self, foreign_table_column: TableColumn):
+        object.__setattr__(self, 'foreign_column_name', foreign_table_column.column_name)
+
     def __str__(self) -> str:
-        output = [f'REFERENCES "{self.foreign_table}"("{self.foreign_column}")']
+        output = [f'REFERENCES "{self.foreign_table_class._table_name}"("{self.foreign_column_name}")']
         if self.on_delete_action is not None:
             output.append(f'ON DELETE {self.on_delete_action}')
         if self.on_update_action is not None:
@@ -143,17 +150,17 @@ class TableColumn(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def column_name(self):
+    def column_name(self) -> str:
         pass
 
     @property
     @abstractmethod
-    def data_type(self):
+    def data_type(self) -> DataType:
         pass
 
     @property
     @abstractmethod
-    def constraints(self):
+    def constraints(self) -> Tuple[ColumnConstraint, ...]:
         pass
 
 
@@ -180,15 +187,15 @@ def column(data_type: DataType, value: Any = None, column_name: str = None,
         class TableColumnClass(TableColumn):
 
             @property
-            def column_name(self):
+            def column_name(self) -> str:
                 return column_name
 
             @property
-            def data_type(self):
+            def data_type(self) -> DataType:
                 return data_type
 
             @property
-            def constraints(self):
+            def constraints(self) -> Tuple[ColumnConstraint, ...]:
                 return constraints
 
         __column_classes[(data_type, column_name, constraints)] = TableColumnClass

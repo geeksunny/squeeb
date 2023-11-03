@@ -2,16 +2,15 @@ from __future__ import annotations
 
 from typing import List
 
-import squeeb
 from squeeb.db import register_db_handler
 from squeeb.model import column, DataType, PrimaryKey, ForeignKey
-from squeeb.model.models import table
+from squeeb.model.models import table, AbstractModel
 
 
 
 
 @table
-class Artist(squeeb.AbstractModel):
+class Artist(AbstractModel):
     id = column(DataType.INTEGER, constraints=PrimaryKey(autoincrement=True, unique=True))
     spotify_id = column(DataType.TEXT)
     name = column(DataType.TEXT)
@@ -29,26 +28,26 @@ class Artist(squeeb.AbstractModel):
 
 
 @table
-class Album(squeeb.AbstractModel):
+class Album(AbstractModel):
     id = column(DataType.INTEGER, constraints=PrimaryKey(autoincrement=True))
     spotify_id = column(DataType.TEXT)
     name = column(DataType.TEXT)
     year = column(DataType.INTEGER)
     genres = column(DataType.TEXT)
-    artist_id = column(DataType.INTEGER, constraints=ForeignKey(Artist, 'id'))
+    artist_id = column(DataType.INTEGER, constraints=ForeignKey(Artist, Artist.id))
     spotify_genres = column(DataType.TEXT)
 
 
 @table
-class Track(squeeb.AbstractModel):
+class Track(AbstractModel):
     id = column(DataType.INTEGER, constraints=PrimaryKey(autoincrement=True))
     spotify_id = column(DataType.TEXT)
     filepath = column(DataType.TEXT)
     name = column(DataType.TEXT)
     duration = column(DataType.INTEGER)
-    artist_id = column(DataType.INTEGER, constraints=ForeignKey(Artist, 'id'))
-    album_artist_id = column(DataType.INTEGER, constraints=ForeignKey(Artist, 'id'))
-    album_id = column(DataType.INTEGER, constraints=ForeignKey(Album, 'id'))
+    artist_id = column(DataType.INTEGER, constraints=ForeignKey(Artist, Artist.id))
+    album_artist_id = column(DataType.INTEGER, constraints=ForeignKey(Artist, Artist.id))
+    album_id = column(DataType.INTEGER, constraints=ForeignKey(Album, Album.id))
     album_track_number = column(DataType.INTEGER)
     danceability = column(DataType.REAL)
     energy = column(DataType.REAL)
