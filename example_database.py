@@ -4,7 +4,6 @@ from typing import List
 
 from squeeb import SelectQueryBuilder
 from squeeb.db import AbstractDbHandler, database
-from squeeb.manager import _register_db_handler
 from squeeb.model import column, DataType, PrimaryKey, ForeignKey
 from squeeb.model.models import table, AbstractModel
 
@@ -142,7 +141,6 @@ class _MusicDb(AbstractDbHandler):
 
 # Singleton instance of the db handler
 db = _MusicDb()
-_register_db_handler(db)
 
 # artist = Artist.from_dict({"name": 1})
 # album = Album.from_dict({"name": "cool"})

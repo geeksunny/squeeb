@@ -7,7 +7,7 @@ from contextlib import closing
 from dataclasses import dataclass
 from typing import List, TypeVar, Type, Tuple, Any, ClassVar
 
-from .manager import _get_table_models
+from .manager import _get_table_models, _register_db_handler
 from .model.models import sort_models
 from .query.queries import QueryBuilder
 
@@ -55,7 +55,7 @@ class AbstractDbHandler(object, metaclass=ABCMeta):
         self._conn.row_factory = sqlite3.Row
 
     def _init_tables(self) -> bool:
-        models = sort_models(_get_table_models(self.__class__._name))
+        models = sort_models(_get_table_models(self.__class__.__name__))
         for model in models:
             success = model.init_table_if_needed()
             if not success:
@@ -150,7 +150,9 @@ def database(cls: Type[AbstractDbHandler] = None, name: str = 'default', filenam
 
     def wrap(clss):
         class Database(clss):
-            pass
+            def __init__(self) -> None:
+                super().__init__()
+                _register_db_handler(self, name)
 
         Database.__name__ = Database.__qualname__ = clss.__name__
         Database._db_filename = filename

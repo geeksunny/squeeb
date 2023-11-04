@@ -140,16 +140,24 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
         return self._table_name
 
     @classmethod
-    def _init_table(self):
-        q = self._create_table_query()
-        result = self._db_handler.exec_query_no_result(q)
-        if isinstance(result, sqlite3.Error):
-            return DbOperationResult(error=DbOperationError(result))
-        elif isinstance(result, int):
+    def init_table_if_needed(self):
+        if not hasattr(self.__class__, '_initialized') or self._initialized is not True:
+            print(f'Table "{self._table_name}" is being created!')
             self.__class__._initialized = True
-            return DbOperationResult()
+            pass
+            # q = self._create_table_query()
+            # result = self._db_handler.exec_query_no_result(q)
+            # if isinstance(result, sqlite3.Error):
+            #     init_result = DbOperationResult(error=DbOperationError(result))
+            # elif isinstance(result, int):
+            #     self.__class__._initialized = True
+            #     init_result = DbOperationResult()
+            # else:
+            #     init_result = DbOperationResult(error=DbOperationError("Unknown error encountered."))
+            # if not init_result.success:
+            #     raise RuntimeError("The database table failed to be created.")
         else:
-            return DbOperationResult(error=DbOperationError("Unknown error encountered."))
+            print(f'Table "{self._table_name}" HAS ALREADY BEEN created!')
 
     def delete(self) -> DbOperationResult:
         # TODO: Review and confirm if this still works after AbstractModel class refactor.
@@ -240,10 +248,7 @@ def table(cls: Type[AbstractModel] = None, db_handler_name: str = 'default', tab
                     self.__class__._db_handler = _get_db_handler()
                     if self.__class__._db_handler is None:
                         raise ValueError("Database handler for this model has not been registered.")
-                if not hasattr(self.__class__, '_initialized') or self.__class__._initialized is not True:
-                    init_result = self.__class__._init_table()
-                    if not init_result.success:
-                        raise RuntimeError("The database table failed to be created.")
+                self.init_table_if_needed()
                 super().__init__()
 
         TableClass.__name__ = TableClass.__qualname__ = clss.__name__
