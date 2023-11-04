@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABCMeta, abstractmethod
-from typing import TypeVar, Dict, Tuple, Any, Iterable, List, Generator
+from typing import TypeVar, Tuple, Any, Iterable, List, Generator
 
 from squeeb.common import ValueMapping
 

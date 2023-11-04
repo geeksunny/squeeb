@@ -3,11 +3,13 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod, ABC
 from dataclasses import dataclass, InitVar, field
 from enum import StrEnum
-from typing import Any, Tuple, Dict, Type
+from typing import Any, Tuple, Dict, Type, TYPE_CHECKING
 
-import squeeb.model
 from squeeb.common import Order
 from squeeb.util import _IStringable
+
+if TYPE_CHECKING:
+    from .models import AbstractModel
 
 
 class DataType(StrEnum):
@@ -63,7 +65,7 @@ class KeyAction(StrEnum):
 
 @dataclass(frozen=True)
 class ForeignKey(ColumnConstraint):
-    foreign_table_class: squeeb.model.models.AbstractModel
+    foreign_table_class: AbstractModel
     foreign_table_column: InitVar[TableColumn]
     foreign_column_name: str = field(init=False)
 

@@ -5,14 +5,15 @@ from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
 from types import MappingProxyType as FrozenDict
-from typing import Type, Dict, TypeVar, List, ClassVar
+from typing import Type, Dict, TypeVar, List, ClassVar, TYPE_CHECKING
 
-from squeeb.db import DbHandler, _get_db_handler, AbstractDbHandler
-from squeeb.query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
-from .columns import TableColumn, PrimaryKey
-from squeeb.util import camel_to_snake_case
 from squeeb.common import ValueMapping
+from squeeb.query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
 from squeeb.query.queries import CreateTableQueryBuilder
+from squeeb.util import camel_to_snake_case
+
+if TYPE_CHECKING:
+    from squeeb.db import DbHandler, AbstractDbHandler
 
 
 class DbOperationError(Exception):

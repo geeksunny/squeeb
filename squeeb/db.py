@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from abc import ABCMeta, abstractmethod
+from abc import ABCMeta
 from contextlib import closing
 from dataclasses import dataclass
-from typing import Any, List, Tuple, Dict, TypeVar
+from typing import List, TypeVar, Type, Tuple, Any, ClassVar
 
 from .query.queries import QueryBuilder
 
