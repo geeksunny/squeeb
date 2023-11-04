@@ -7,6 +7,8 @@ from contextlib import closing
 from dataclasses import dataclass
 from typing import List, TypeVar, Type, Tuple, Any, ClassVar
 
+from .manager import _get_table_models
+from .model.models import sort_models
 from .query.queries import QueryBuilder
 
 
@@ -42,20 +44,23 @@ logger = logging.getLogger()
 
 
 class AbstractDbHandler(object, metaclass=ABCMeta):
-    _conn = None
+    # _conn = None
+
+    _db_filename: ClassVar[str]
+    _name: ClassVar[str]
 
     def __init__(self) -> None:
         super().__init__()
-        self._conn = sqlite3.connect(self._db_filename())
+        self._conn = sqlite3.connect(self._db_filename)
         self._conn.row_factory = sqlite3.Row
 
-    @abstractmethod
-    def _db_filename(self) -> str:
-        pass
-
-    @abstractmethod
     def _init_tables(self) -> bool:
-        pass
+        models = sort_models(_get_table_models(self.__class__._name))
+        for model in models:
+            success = model.init_table_if_needed()
+            if not success:
+                return False
+        return True
 
     def __del__(self):
         self.close()
@@ -127,15 +132,31 @@ class AbstractDbHandler(object, metaclass=ABCMeta):
             self._conn = None
 
 
+def database(cls: Type[AbstractDbHandler] = None, name: str = 'default', filename: str = None):
+    """
+    Decorates an AbstractDbHandler subclass to wire up internal dependencies.
+    :param cls: The class being generated. This is passed automatically and can be ignored.
+    :param name: The name that this database will be associated with. Models that will be stored in this database should
+           reference this name in their decorators. Default name is 'default'.
+    :param filename: The filename that will be used for the sqlite database.
+    :return: A wrapped subclass of your decorated class definition.
+    """
+    if cls is not None and not issubclass(cls, AbstractDbHandler):
+        raise TypeError("Decorated class must be a subclass of AbstractDbHandler.")
+    if not isinstance(name, str) or len(name) == 0:
+        raise TypeError("Database name must be a string value.")
+    if filename is None:
+        filename = f'{name}.db'
+
+    def wrap(clss):
+        class Database(clss):
+            pass
+
+        Database.__name__ = Database.__qualname__ = clss.__name__
+        Database._db_filename = filename
+        return Database
+
+    return wrap if cls is None else wrap(cls)
+
+
 DbHandler = TypeVar('DbHandler', bound=AbstractDbHandler)
-
-
-__db_handlers: Dict[str, DbHandler] = {}
-
-
-def register_db_handler(db_handler: DbHandler, name: str = 'default'):
-    __db_handlers[name] = db_handler
-
-
-def _get_db_handler(name: str = 'default') -> DbHandler:
-    return __db_handlers[name] if name in __db_handlers else None

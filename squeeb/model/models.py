@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import sqlite3
 from abc import ABCMeta, abstractmethod
 from copy import deepcopy
@@ -8,9 +9,11 @@ from types import MappingProxyType as FrozenDict
 from typing import Type, Dict, TypeVar, List, ClassVar, TYPE_CHECKING
 
 from squeeb.common import ValueMapping
+from squeeb.manager import _get_db_handler
 from squeeb.query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
 from squeeb.query.queries import CreateTableQueryBuilder
 from squeeb.util import camel_to_snake_case
+from .columns import TableColumn, PrimaryKey, ForeignKey
 
 if TYPE_CHECKING:
     from squeeb.db import DbHandler, AbstractDbHandler
@@ -352,3 +355,30 @@ class ModelList(list, _ICrud):
 
     def _update_many(self):
         pass
+
+
+def sort_models(models: List[ModelType]):
+    foreign_key_map: Dict[ModelType, List[ModelType]] = {}
+
+    def foreign_models(model: ModelType) -> List[ModelType]:
+        if model not in foreign_key_map:
+            foreign_key_map[model] = []
+            for column_name in model.__mapping__:
+                column: TableColumn = getattr(model, column_name)
+                for constraint in column.constraints:
+                    if isinstance(constraint, ForeignKey):
+                        foreign_key_map[model].append(constraint.foreign_table_class)
+
+        return foreign_key_map[model]
+
+    def compare(a: ModelType, b: ModelType):
+        map_a = foreign_models(a)
+        map_b = foreign_models(b)
+        if a in map_b:
+            return -1
+        elif b in map_a:
+            return 1
+        else:
+            return 0
+
+    return sorted(models, key=functools.cmp_to_key(compare))

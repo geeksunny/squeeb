@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from typing import List
 
-from squeeb.db import register_db_handler
 from squeeb import SelectQueryBuilder
 from squeeb.db import AbstractDbHandler, database
+from squeeb.manager import _register_db_handler
 from squeeb.model import column, DataType, PrimaryKey, ForeignKey
 from squeeb.model.models import table, AbstractModel
 
@@ -64,22 +64,20 @@ class Track(AbstractModel):
     valence = column(DataType.REAL)
 
 
-class _MusicDb(squeeb.AbstractDbHandler):
+@database(filename="smrtypntz.db")
+class _MusicDb(AbstractDbHandler):
 
     # todo: crud methods for music data
 
-    def _db_filename(self) -> str:
-        return "smrtypntz.db"
-
-    def _init_tables(self) -> bool:
-        success = True
-        if self._table_exists("artists") is False:
-            success = success and self._create_table_artists()
-        if self._table_exists("albums") is False:
-            success = success and self._create_table_albums()
-        if self._table_exists("tracks") is False:
-            success = success and self._create_table_tracks()
-        return success
+    # def _init_tables(self) -> bool:
+    #     success = True
+    #     if self._table_exists("artists") is False:
+    #         success = success and self._create_table_artists()
+    #     if self._table_exists("albums") is False:
+    #         success = success and self._create_table_albums()
+    #     if self._table_exists("tracks") is False:
+    #         success = success and self._create_table_tracks()
+    #     return success
 
     def _create_table_artists(self) -> bool:
         return self._exec_raw_query_no_result('''CREATE TABLE "artists" (
@@ -127,24 +125,24 @@ class _MusicDb(squeeb.AbstractDbHandler):
             )''')
 
     def get_all_artists(self) -> List[Artist]:
-        query = squeeb.SelectQueryBuilder('artists')
-        rows = self._exec_query_all_results(query)
+        query = SelectQueryBuilder('artists')
+        rows = self.exec_query_all_results(query)
         # TODO: Deserialize the results into Artist objects
 
-    def get_all_artists(self) -> List[Artist]:
-        query = squeeb.SelectQueryBuilder('artists')
-        rows = self._exec_query_all_results(query)
-        # TODO: Deserialize the results into Artist objects
+    def get_all_albums(self) -> List[Album]:
+        query = SelectQueryBuilder('albums')
+        rows = self.exec_query_all_results(query)
+        # TODO: Deserialize the results into Album objects
 
-    def get_all_artists(self) -> List[Artist]:
-        query = squeeb.SelectQueryBuilder('artists')
-        rows = self._exec_query_all_results(query)
-        # TODO: Deserialize the results into Artist objects
+    def get_all_tracks(self) -> List[Track]:
+        query = SelectQueryBuilder('tracks')
+        rows = self.exec_query_all_results(query)
+        # TODO: Deserialize the results into Track objects
 
 
 # Singleton instance of the db handler
 db = _MusicDb()
-register_db_handler(db)
+_register_db_handler(db)
 
 # artist = Artist.from_dict({"name": 1})
 # album = Album.from_dict({"name": "cool"})
