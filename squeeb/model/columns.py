@@ -5,6 +5,7 @@ from dataclasses import dataclass, InitVar, field
 from enum import StrEnum
 from typing import Any, Tuple, Dict, Type
 
+import squeeb.model
 from squeeb.common import Order
 from squeeb.util import _IStringable
 
@@ -62,7 +63,7 @@ class KeyAction(StrEnum):
 
 @dataclass(frozen=True)
 class ForeignKey(ColumnConstraint):
-    foreign_table_class: Any  # TODO: Refactor this to use AbstractModel once circular import can be addressed
+    foreign_table_class: squeeb.model.models.AbstractModel
     foreign_table_column: InitVar[TableColumn]
     foreign_column_name: str = field(init=False)
 
