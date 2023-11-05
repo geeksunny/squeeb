@@ -2,14 +2,14 @@ from __future__ import annotations
 
 import logging
 import sqlite3
-from abc import ABCMeta
 from contextlib import closing
 from dataclasses import dataclass
 from typing import List, TypeVar, Type, Tuple, Any, ClassVar
 
 from .manager import _get_table_models, _register_db_handler
-from .model.models import sort_models
+from .model.models import sort_models, ModelType
 from .query.queries import QueryBuilder
+from .util import Singleton
 
 
 class BaseDbHandlerResult:
@@ -43,7 +43,25 @@ class DbHandlerMultiResult(BaseDbHandlerResult):
 logger = logging.getLogger()
 
 
-class AbstractDbHandler(object, metaclass=ABCMeta):
+class TableRegistry:
+
+    _tables_queue: List[Type[ModelType]] = []
+    _tables_ready: List[Type[ModelType]] = []
+
+    def __init__(self):
+        super().__init__()
+        self.__queued: List[Type[ModelType]] = []
+        self.__initialized: List[Type[ModelType]] = []
+
+    @classmethod
+    def register_table(cls, table_model: Type[ModelType]):
+        if table_model.initialized:
+            cls._tables_ready.append(table_model) if table_model not in cls._tables_ready else None
+        else:
+            cls._tables_queue.append(table_model) if table_model not in cls._tables_queue else None
+
+
+class AbstractDbHandler(TableRegistry, metaclass=Singleton):
     # _conn = None
 
     _db_filename: ClassVar[str]
