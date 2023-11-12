@@ -28,16 +28,10 @@ def table(cls: Type[Model] = None, db_class: Type[Database] = None, table_name: 
         class TableClass(clss):
 
             def __init__(self) -> None:
-                if not hasattr(self.__class__, '_db_handler') or self.__class__._db_handler is None:
-                    self.__class__._db_handler = db_class()
-                    if self.__class__._db_handler is None:
+                if not hasattr(self.__class__, '_db') or self.__class__._db is None:
+                    self.__class__._db = db_class()
+                    if self.__class__._db is None:
                         raise ValueError("Database handler for this model has not been registered.")
-                    print(f'DB HANDLER ADDRESS: {id(self.__class__._db_handler)}')
-                # if not hasattr(self.__class__, '_db_handler') or self.__class__._db_handler is None:
-                #     self.__class__._db_handler = _get_db_handler()
-                #     if self.__class__._db_handler is None:
-                #         raise ValueError("Database handler for this model has not been registered.")
-                # self.init_table_if_needed()
                 super().__init__()
 
         TableClass.__name__ = TableClass.__qualname__ = clss.__name__
