@@ -9,7 +9,7 @@ from squeeb.common import Order
 from squeeb.util import _IStringable
 
 if TYPE_CHECKING:
-    from .models import AbstractModel
+    from .model.models import Model
 
 
 class DataType(StrEnum):
@@ -65,7 +65,7 @@ class KeyAction(StrEnum):
 
 @dataclass(frozen=True)
 class ForeignKey(ColumnConstraint):
-    foreign_table_class: AbstractModel
+    foreign_table_class: Model
     foreign_table_column: InitVar[TableColumn]
     foreign_column_name: str = field(init=False)
 

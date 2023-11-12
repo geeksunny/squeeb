@@ -4,12 +4,11 @@ import logging
 import sqlite3
 from contextlib import closing
 from dataclasses import dataclass
-from typing import List, TypeVar, Type, Tuple, Any, ClassVar
+from typing import List, Type, Tuple, Any
 
-from .manager import _get_table_models, _register_db_handler
-from .model.models import sort_models, ModelType
-from .query.queries import QueryBuilder
-from .util import Singleton
+from .model.models import sort_models, Model
+from .query.queries import QueryBuilder, SelectQueryBuilder
+from .util import Singleton, camel_to_snake_case
 
 
 class BaseDbHandlerResult:
@@ -43,50 +42,38 @@ class DbHandlerMultiResult(BaseDbHandlerResult):
 logger = logging.getLogger()
 
 
-class TableRegistry:
-
-    _tables_queue: List[Type[ModelType]] = []
-    _tables_ready: List[Type[ModelType]] = []
-
-    def __init__(self):
-        super().__init__()
-        self.__queued: List[Type[ModelType]] = []
-        self.__initialized: List[Type[ModelType]] = []
-
-    @classmethod
-    def register_table(cls, table_model: Type[ModelType]):
-        if table_model.initialized:
-            cls._tables_ready.append(table_model) if table_model not in cls._tables_ready else None
-        else:
-            cls._tables_queue.append(table_model) if table_model not in cls._tables_queue else None
-
-
-class AbstractDbHandler(TableRegistry, metaclass=Singleton):
+class Database(metaclass=Singleton):
     # _conn = None
+    __tables__: List[Type[Model]] = []
 
-    _db_filename: ClassVar[str]
-    _name: ClassVar[str]
-
-    def __init__(self) -> None:
-        super().__init__()
-        self._conn = sqlite3.connect(self._db_filename)
+    def __init__(self, file_path: str = None, version: int = 0):
+        if file_path is None:
+            file_path = f'{self.__class__.__name__}.db'
+        # Open database or create if not exists.
+        self._conn = sqlite3.connect(file_path)
         self._conn.row_factory = sqlite3.Row
-
-    def _init_tables(self) -> bool:
-        models = sort_models(_get_table_models(self.__class__.__name__))
-        for model in models:
-            success = model.init_table_if_needed()
-            if not success:
-                return False
-        return True
+        # Create tables if they do not exist.
+        self._init_tables()
 
     def __del__(self):
         self.close()
 
+    @classmethod
+    def register_table(cls, table_model: Type[Model]):
+        cls.__tables__.append(table_model) if table_model not in cls.__tables__ else None
+
+    def _init_tables(self):
+        models = sort_models(self.__tables__)
+        for model in models:
+            success = model.init_table()
+            if not success:
+                return False
+        return True
+
     def _exec_raw_query_no_result(self, query_str: str, args=None) -> DbHandlerNoResult:
         try:
             with closing(self._conn.cursor()) as c:
-                c.execute(query_str, args)
+                c.execute(query_str, args if args is not None else ())
                 return DbHandlerNoResult(c.rowcount)
         except sqlite3.Error as e:
             logger.error(e)
@@ -95,7 +82,7 @@ class AbstractDbHandler(TableRegistry, metaclass=Singleton):
     def _exec_raw_query_single_result(self, query_str: str, args=None) -> DbHandlerSingleResult:
         try:
             with closing(self._conn.cursor()) as c:
-                c.execute(query_str, args)
+                c.execute(query_str, args if args is not None else ())
                 return DbHandlerSingleResult(c.fetchone())
         except sqlite3.Error as e:
             logger.error(e)
@@ -104,7 +91,7 @@ class AbstractDbHandler(TableRegistry, metaclass=Singleton):
     def _exec_raw_query_all_results(self, query_str: str, args: Tuple[Any] = None) -> DbHandlerMultiResult:
         try:
             with closing(self._conn.cursor()) as c:
-                c.execute(query_str, args)
+                c.execute(query_str, args if args is not None else ())
                 return DbHandlerMultiResult(c.fetchall())
         except sqlite3.Error as e:
             logger.error(e)
@@ -144,39 +131,47 @@ class AbstractDbHandler(TableRegistry, metaclass=Singleton):
         return self._exec_raw_query_single_result(
             "SELECT * FROM sqlite_master WHERE type='table' AND name='%s'" % table_name)[0] == 1
 
+    def _get_user_version(self) -> int:
+        result = self._exec_raw_query_single_result("PRAGMA user_version")
+        return result.row['user_version']
+
     def close(self) -> None:
         if self._conn is not None:
             self._conn.close()
             self._conn = None
 
 
-def database(cls: Type[AbstractDbHandler] = None, name: str = 'default', filename: str = None):
-    """
-    Decorates an AbstractDbHandler subclass to wire up internal dependencies.
-    :param cls: The class being generated. This is passed automatically and can be ignored.
-    :param name: The name that this database will be associated with. Models that will be stored in this database should
-           reference this name in their decorators. Default name is 'default'.
-    :param filename: The filename that will be used for the sqlite database.
-    :return: A wrapped subclass of your decorated class definition.
-    """
-    if cls is not None and not issubclass(cls, AbstractDbHandler):
-        raise TypeError("Decorated class must be a subclass of AbstractDbHandler.")
-    if not isinstance(name, str) or len(name) == 0:
-        raise TypeError("Database name must be a string value.")
-    if filename is None:
-        filename = f'{name}.db'
+class DatabaseManager(Singleton):
 
-    def wrap(clss):
-        class Database(clss):
-            def __init__(self) -> None:
-                super().__init__()
-                _register_db_handler(self, name)
+    def __new__(metacls, name, bases, namespace, **kwargs):
+        try:
+            db = kwargs['database']
+            if not issubclass(db, Database):
+                raise TypeError('Class database argument must be a subclass of Database.')
+        except KeyError:
+            raise TypeError('Class definition is missing the `database` argument.')
 
-        Database.__name__ = Database.__qualname__ = clss.__name__
-        Database._db_filename = filename
-        return Database
+        def make_get_all_method(model_class: Type[Model]):
+            def get_all(self):
+                query = SelectQueryBuilder(model_class.__table_name__).build()
+                print(f'SELECT ALL QUERY: {query.query}')
+                result = self._db._exec_raw_query_all_results(query.query)
+                # TODO: Create array of objects deserialized from result.rows, return that instead.
+                return result.rows
+            return get_all
 
-    return wrap if cls is None else wrap(cls)
+        cls = super().__new__(metacls, name, bases, namespace)
+        print(f'SmrtyPntz.__tables__: {str(db.__tables__)}')
+        setattr(cls, '_db', db())
+        for table in db.__tables__:
+            setattr(cls, f'get_all_{camel_to_snake_case(table.__name__, lowercase=True)}s', make_get_all_method(table))
+        return cls
 
 
-DbHandler = TypeVar('DbHandler', bound=AbstractDbHandler)
+def make_database_class(name: str, file_path: str = None, version: int = 0):
+    class Db(Database):
+        def __init__(self):
+            super().__init__(file_path, version)
+
+    Db.__name__ = Db.__qualname__ = name
+    return Db

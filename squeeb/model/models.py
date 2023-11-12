@@ -6,17 +6,15 @@ from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 from dataclasses import dataclass, field
 from types import MappingProxyType as FrozenDict
-from typing import Type, Dict, TypeVar, List, ClassVar, TYPE_CHECKING
+from typing import Type, Dict, List, ClassVar, TYPE_CHECKING
 
 from squeeb.common import ValueMapping
-from squeeb.manager import _get_db_handler
 from squeeb.query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
 from squeeb.query.queries import CreateTableQueryBuilder
-from squeeb.util import camel_to_snake_case
 from .columns import TableColumn, PrimaryKey, ForeignKey
 
 if TYPE_CHECKING:
-    from squeeb.db import DbHandler, AbstractDbHandler
+    from squeeb.db import Database
 
 
 class DbOperationError(Exception):
@@ -75,13 +73,13 @@ class ModelMetaClass(ABCMeta):
         super().__setattr__(__name, __value)
 
 
-class AbstractModel(_ICrud, metaclass=ModelMetaClass):
+class Model(_ICrud, metaclass=ModelMetaClass):
     # _changed_fields: List[str]
 
     __mapping__: ClassVar[Dict[str, str]]
     __mapping_inverse__: ClassVar[Dict[str, str]]
-    _db_handler: ClassVar[AbstractDbHandler]
-    _table_name: ClassVar[str]
+    __table_name__: ClassVar[str]
+    _db: ClassVar[Database]
     _initialized: ClassVar[bool]
 
     @classmethod
@@ -118,15 +116,6 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
         else:
             super().__setattr__(__name, __value)
 
-    @classmethod
-    def _create_table_query(cls) -> CreateTableQueryBuilder:
-        # TODO: Implement the rest of this query builder once the class is completed.
-        return CreateTableQueryBuilder(cls._table_name)
-
-    @property
-    def db_handler(self) -> DbHandler:
-        return self._db_handler
-
     @property
     def id(self):
         return getattr(self, '_id')
@@ -137,16 +126,27 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
 
     @property
     def table_name(self) -> str:
-        return self._table_name
+        return self.__table_name__
+
+    @property
+    def initialized(self):
+        return self.__class__._initialized
 
     @classmethod
-    def init_table_if_needed(self):
-        if not hasattr(self.__class__, '_initialized') or self._initialized is not True:
-            print(f'Table "{self._table_name}" is being created!')
-            self.__class__._initialized = True
+    def _create_table_query(cls) -> CreateTableQueryBuilder:
+        # TODO: Implement the rest of this query builder once the class is completed.
+        return CreateTableQueryBuilder(cls.__table_name__)
+
+    @classmethod
+    def init_table(cls):
+        # TODO: NEEDS TO BE TESTED WHEN CreateTableQueryBuilder IS IMPLEMENTED!
+        if not hasattr(cls, '_initialized') or cls._initialized is not True:
+            print(f'Table "{cls.__table_name__}" is being created!')
+            pass
+            cls._initialized = True
             pass
             # q = self._create_table_query()
-            # result = self._db_handler.exec_query_no_result(q)
+            # result = self._db.exec_query_no_result(q)
             # if isinstance(result, sqlite3.Error):
             #     init_result = DbOperationResult(error=DbOperationError(result))
             # elif isinstance(result, int):
@@ -157,7 +157,7 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
             # if not init_result.success:
             #     raise RuntimeError("The database table failed to be created.")
         else:
-            print(f'Table "{self._table_name}" HAS ALREADY BEEN created!')
+            print(f'Table "{cls.__table_name__}" HAS ALREADY BEEN created!')
 
     def delete(self) -> DbOperationResult:
         # TODO: Review and confirm if this still works after AbstractModel class refactor.
@@ -200,98 +200,47 @@ class AbstractModel(_ICrud, metaclass=ModelMetaClass):
             value_map.append({column_name: attr.value})
         return value_map
 
-    def populate(self, columns_and_values: ValueMapping) -> None:
+    def populate(self, columns_and_values: ValueMapping | sqlite3.Row) -> None:
         for column_name, value in columns_and_values.items():
             if column_name not in self.__mapping_inverse__:
                 raise AttributeError(f"No column mapping exists for column {column_name}.")
             getattr(self, self.__mapping_inverse__[column_name]).value = value
 
-    def from_sqlite(self, row: sqlite3.Row) -> None:
-        # TODO: Test that this works the same as feeding a dict into self.populate;
-        #  Remove this method and add sqlite3.Row to the type hint of self.populate if so.
-        self.populate(row)
-        # for sql_key in row.keys():
-        #     key = sqlite_field_mapping[sql_key]\
-        #         if sqlite_field_mapping is not None and sql_key in sqlite_field_mapping\
-        #         else sql_key
-        #     self[key] = row[sql_key]
-
-
-ModelType = TypeVar('ModelType', bound=AbstractModel)
-
-
-def table(cls: Type[AbstractModel] = None, db_handler_name: str = 'default', table_name: str = None):
-    """
-    Decorates an AbstractModel subclass to wire up internal dependencies.
-    :param cls: The class being generated. This is passed automatically and can be ignored.
-    :param db_handler_name: The name of a DbHandler that's been registered with `register_db_handler(db_handler, name)`.
-           This uses the default handler if no name is passed.
-    :param table_name: The table name that this model will be represented as in the database.
-           The name will default to an all lower-case snake-cased pluralized version of your models name.
-           For example: A model class named 'ItemRecord' will become 'item_records'.
-    :return: A wrapped subclass of your decorated class definition.
-    """
-    if cls is not None and not issubclass(cls, AbstractModel):
-        raise TypeError("Decorated class must be a subclass of AbstractModel.")
-    if not isinstance(db_handler_name, str):
-        raise TypeError("Database handler name must be a string value.")
-    if table_name is not None and (not isinstance(table_name, str) or len(table_name) == 0):
-        raise TypeError("Invalid table_name provided.")
-
-    def wrap(clss):
-        _table_name = table_name if table_name is not None else f'{camel_to_snake_case(clss.__name__, lowercase=True)}s'
-
-        class TableClass(clss):
-
-            def __init__(self) -> None:
-                if not hasattr(self.__class__, '_db_handler') or self.__class__._db_handler is None:
-                    self.__class__._db_handler = _get_db_handler()
-                    if self.__class__._db_handler is None:
-                        raise ValueError("Database handler for this model has not been registered.")
-                self.init_table_if_needed()
-                super().__init__()
-
-        TableClass.__name__ = TableClass.__qualname__ = clss.__name__
-        TableClass._table_name = _table_name
-        return TableClass
-
-    return wrap if cls is None else wrap(cls)
-
 
 @dataclass(frozen=True)
 class DbOperationResults(DbOperationResult):
-    results: Dict[ModelType, DbOperationResult] = field(default_factory=dict)
+    results: Dict[Type[Model], DbOperationResult] = field(default_factory=dict)
 
 
 class ModelList(list, _ICrud):
-    # _model_type: Type[ModelType]
+    # _model_type: Type[Model]
     # _index: Dict[Union[str, int, None], Any]
 
-    def __init__(self, model_type: Type[ModelType]) -> None:
+    def __init__(self, model_type: Type[Model]) -> None:
         super().__init__()
-        if not isinstance(model_type, type) or not issubclass(model_type, AbstractModel):
+        if not isinstance(model_type, type) or not issubclass(model_type, Model):
             raise TypeError("Invalid model type provided.")
         self._model_type = model_type
 
-    def append(self, __object: ModelType) -> None:
+    def append(self, __object: Model) -> None:
         if not isinstance(__object, self._model_type):
             raise TypeError("Incorrect model type.")
         else:
             super().append(__object)
 
-    def insert(self, __index: int, __object: ModelType) -> None:
+    def insert(self, __index: int, __object: Model) -> None:
         if not isinstance(__object, self._model_type):
             raise TypeError("Incorrect model type.")
         else:
             super().insert(__index, __object)
 
-    def __add__(self, x: ModelList[ModelType]):
+    def __add__(self, x: ModelList[Model]):
         if not isinstance(x, ModelList) or x._model_type is not self._model_type:
             raise TypeError("Incorrect model type.")
         else:
             return super().__add__(x)
 
-    def __iadd__(self, x: ModelList[ModelType]):
+    def __iadd__(self, x: ModelList[Model]):
         if not isinstance(x, ModelList) or x._model_type is not self._model_type:
             raise TypeError("Incorrect model type.")
         else:
@@ -362,10 +311,10 @@ class ModelList(list, _ICrud):
         pass
 
 
-def sort_models(models: List[ModelType]):
-    foreign_key_map: Dict[ModelType, List[ModelType]] = {}
+def sort_models(models: List[Model]):
+    foreign_key_map: Dict[Model, List[Model]] = {}
 
-    def foreign_models(model: ModelType) -> List[ModelType]:
+    def foreign_models(model: Model) -> List[Model]:
         if model not in foreign_key_map:
             foreign_key_map[model] = []
             for column_name in model.__mapping__:
@@ -376,7 +325,7 @@ def sort_models(models: List[ModelType]):
 
         return foreign_key_map[model]
 
-    def compare(a: ModelType, b: ModelType):
+    def compare(a: Model, b: Model):
         map_a = foreign_models(a)
         map_b = foreign_models(b)
         if a in map_b:
