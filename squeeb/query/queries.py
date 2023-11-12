@@ -188,6 +188,29 @@ class DeleteQueryBuilder(AbstractQueryBuilder):
         }) if self._where_conditions is not None else ''
 
 
+class PragmaQueryBuilder(AbstractQueryBuilder):
+
+    def __init__(self, command: str, target: str = None, value: Any = None) -> None:
+        super().__init__('')
+        self._command = command
+        self._target = target
+        self._value = value
+
+    def _get_args_needed(self) -> Tuple[_QueryArgs]:
+        return []
+
+    def _get_query_str(self) -> str:
+        if self._target is not None:
+            argument = f'({self._target})'
+        elif self._value is not None:
+            # TODO: Implement a way to manage quoted vs non-quoted string values.
+            argument = f'={self._value}'
+        else:
+            argument = ''
+        command = f'PRAGMA {self._command}{argument}'
+        return command
+
+
 def where(*args) -> MutableQueryCondition:
     if len(args) == 1 and type(args[0]) is str:
         return MutableQueryCondition(args[0])
