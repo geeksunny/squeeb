@@ -70,7 +70,7 @@ class Database(metaclass=Singleton):
                 return False
         return True
 
-    def _exec_raw_query_no_result(self, query_str: str, args=None) -> DbHandlerNoResult:
+    def _exec_raw_query_no_result(self, query_str: str, args: Any = None) -> DbHandlerNoResult:
         try:
             with closing(self._conn.cursor()) as c:
                 c.execute(query_str, args if args is not None else ())
@@ -79,7 +79,7 @@ class Database(metaclass=Singleton):
             logger.error(e)
             return DbHandlerNoResult(error=e)
 
-    def _exec_raw_query_single_result(self, query_str: str, args=None) -> DbHandlerSingleResult:
+    def _exec_raw_query_single_result(self, query_str: str, args: Any = None) -> DbHandlerSingleResult:
         try:
             with closing(self._conn.cursor()) as c:
                 c.execute(query_str, args if args is not None else ())

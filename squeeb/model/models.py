@@ -311,10 +311,10 @@ class ModelList(list, _ICrud):
         pass
 
 
-def sort_models(models: List[Model]):
-    foreign_key_map: Dict[Model, List[Model]] = {}
+def sort_models(models: List[Type[Model]]):
+    foreign_key_map: Dict[Type[Model], List[Type[Model]]] = {}
 
-    def foreign_models(model: Model) -> List[Model]:
+    def foreign_models(model: Type[Model]) -> List[Type[Model]]:
         if model not in foreign_key_map:
             foreign_key_map[model] = []
             for column_name in model.__mapping__:
@@ -325,7 +325,7 @@ def sort_models(models: List[Model]):
 
         return foreign_key_map[model]
 
-    def compare(a: Model, b: Model):
+    def compare(a: Type[Model], b: Type[Model]):
         map_a = foreign_models(a)
         map_b = foreign_models(b)
         if a in map_b:

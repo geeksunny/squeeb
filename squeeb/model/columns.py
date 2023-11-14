@@ -9,7 +9,7 @@ from squeeb.common import Order
 from squeeb.util import _IStringable
 
 if TYPE_CHECKING:
-    from .model.models import Model
+    from .models import Model
 
 
 class DataType(StrEnum):
