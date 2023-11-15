@@ -65,7 +65,7 @@ class KeyAction(StrEnum):
 
 @dataclass(frozen=True)
 class ForeignKey(ColumnConstraint):
-    foreign_table_class: Model
+    foreign_table_class: Type[Model]
     foreign_table_column: InitVar[TableColumn]
     foreign_column_name: str = field(init=False)
 
@@ -77,7 +77,7 @@ class ForeignKey(ColumnConstraint):
         object.__setattr__(self, 'foreign_column_name', foreign_table_column.column_name)
 
     def __str__(self) -> str:
-        output = [f'REFERENCES "{self.foreign_table_class._table_name}"("{self.foreign_column_name}")']
+        output = [f'REFERENCES "{self.foreign_table_class.__table_name__}"("{self.foreign_column_name}")']
         if self.on_delete_action is not None:
             output.append(f'ON DELETE {self.on_delete_action}')
         if self.on_update_action is not None:

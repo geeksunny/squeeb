@@ -4,14 +4,16 @@ import logging
 import sqlite3
 from contextlib import closing
 from dataclasses import dataclass
-from typing import List, Type, Tuple, Any
+from typing import List, Type, Tuple, Any, ClassVar
 
-from .model.models import sort_models, Model
+from .model.models import _sort_models, Model, _validate_foreign_keys
 from .query.queries import QueryBuilder, SelectQueryBuilder
 from .util import Singleton, camel_to_snake_case
 
 
 class BaseDbHandlerResult:
+    error: sqlite3.Error = None
+
     @property
     def success(self):
         return self.error is not None
@@ -44,7 +46,7 @@ logger = logging.getLogger()
 
 class Database(metaclass=Singleton):
     # _conn = None
-    __tables__: List[Type[Model]] = []
+    __tables__: ClassVar[List[Type[Model]]] = []
 
     def __init__(self, file_path: str = None, version: int = 0):
         if file_path is None:
@@ -63,7 +65,8 @@ class Database(metaclass=Singleton):
         cls.__tables__.append(table_model) if table_model not in cls.__tables__ else None
 
     def _init_tables(self):
-        models = sort_models(self.__tables__)
+        _validate_foreign_keys(self)
+        models = _sort_models(self.__tables__)
         for model in models:
             success = model.init_table()
             if not success:
@@ -154,14 +157,12 @@ class DatabaseManager(Singleton):
         def make_get_all_method(model_class: Type[Model]):
             def get_all(self):
                 query = SelectQueryBuilder(model_class.__table_name__).build()
-                print(f'SELECT ALL QUERY: {query.query}')
                 result = self._db._exec_raw_query_all_results(query.query)
                 # TODO: Create array of objects deserialized from result.rows, return that instead.
                 return result.rows
             return get_all
 
         cls = super().__new__(metacls, name, bases, namespace)
-        print(f'SmrtyPntz.__tables__: {str(db.__tables__)}')
         setattr(cls, '_db', db())
         for table in db.__tables__:
             setattr(cls, f'get_all_{camel_to_snake_case(table.__name__, lowercase=True)}s', make_get_all_method(table))

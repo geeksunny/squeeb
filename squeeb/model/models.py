@@ -311,7 +311,28 @@ class ModelList(list, _ICrud):
         pass
 
 
-def sort_models(models: List[Type[Model]]):
+def _validate_foreign_keys(database: Database):
+    """
+    Checks that all the foreign keys defined to each database table only reference other tables in the given database.
+    Raises sqlite3.IntegrityError upon finding a foreign table that is not assigned to the database.
+    :param database: The given database to be validated.
+    """
+    for model in database.__class__.__tables__:
+        for column_name in model.__mapping__:
+            column: TableColumn = getattr(model, column_name)
+            for constraint in column.constraints:
+                if (isinstance(constraint, ForeignKey)
+                        and constraint.foreign_table_class not in database.__class__.__tables__):
+                    raise sqlite3.IntegrityError(
+                        f'Foreign key table `{str(model.__table_name__)}` is not associated with database `{database.__class__.__name__}`.')
+
+
+def _sort_models(models: List[Type[Model]]):
+    """
+    Sorts a list of Model classes in order of foreign key dependency.
+    :param models: The list of model classes to be sorted.
+    :return: A sorted list of model classes with foreign referenced tables coming before the tables that reference them.
+    """
     foreign_key_map: Dict[Type[Model], List[Type[Model]]] = {}
 
     def foreign_models(model: Type[Model]) -> List[Type[Model]]:
