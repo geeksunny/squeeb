@@ -4,12 +4,15 @@ import string
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Tuple, Any, List, TypeVar, Self
+from typing import Tuple, Any, List, TypeVar, Self, Type, TYPE_CHECKING
 
 from squeeb.common import ValueMapping
 from squeeb.query.conditions import _IQueryCondition, QueryConditionSequence, QueryConditionGroup, \
     MutableQueryCondition, QueryCondition
 from squeeb.query.values import _QueryValueMap, _QueryValueMapGroup
+
+if TYPE_CHECKING:
+    from squeeb.model.models import Model, TableColumn
 
 
 @dataclass
@@ -94,7 +97,7 @@ class AbstractQueryBuilder(object, metaclass=ABCMeta):
         return tuple(query_args)
 
     def build(self) -> Query:
-        return Query(self._get_query_str(), self._get_args(self._get_args_needed())) if self._table_name is not None\
+        return Query(self._get_query_str(), self._get_args(self._get_args_needed())) if self._table_name is not None \
             else Query(error="No table name provided.")
 
 
@@ -116,12 +119,62 @@ class CreateIndexQueryBuilder(AbstractQueryBuilder):
 
 
 class CreateTableQueryBuilder(AbstractQueryBuilder):
+    _table_model: Type[Model]
+    _is_temporary: bool = False
+    _if_not_exists: bool = False
+    _strict: bool = False
+    _without_rowid: bool = False
+
+    def __init__(self, table_model: Type[Model], is_temporary: bool = False, if_not_exists: bool = False,
+                 strict: bool = False, without_rowid: bool = False) -> None:
+        super().__init__('')
+        self._table_model = table_model
+        # TODO: Move `is_temporary`, `strict`, `without_rowid` into Model class.
+        self._is_temporary = is_temporary
+        self._if_not_exists = if_not_exists
+        self._strict = strict
+        self._without_rowid = without_rowid
+
+    def if_not_exists(self) -> Self:
+        self._if_not_exists = True
+        return self
+
+    def temp_table(self) -> Self:
+        self._is_temporary = True
+        return self
+
+    def strict(self) -> Self:
+        self._strict = True
+        return self
+
+    def without_rowid(self) -> Self:
+        self._without_rowid = True
+        return self
+
+    def _get_columns_str(self) -> str:
+        columns = []
+        for column_name in self._table_model.__mapping__:
+            column: TableColumn = getattr(self._table_model, column_name)
+            columns.append(str(column))
+        return ', '.join(columns)
 
     def _get_args_needed(self) -> Tuple[_QueryArgs]:
         pass
 
     def _get_query_str(self) -> str:
-        pass
+        tmpl = string.Template('CREATE $temp TABLE $if_not_exists $table ($columns) $options')
+        table_options = []
+        if self._strict is True:
+            table_options.append('STRICT')
+        if self._without_rowid is True:
+            table_options.append('WITHOUT ROWID')
+        return tmpl.substitute({
+            "temp": 'TEMPORARY' if self._is_temporary is True else '',
+            "if_not_exists": 'IF NOT EXISTS' if self._if_not_exists is True else '',
+            "table": self._table_name,
+            "columns": self._get_columns_str(),
+            "options": ', '.join(table_options)
+        })
 
 
 class DropTableQueryBuilder(AbstractQueryBuilder):

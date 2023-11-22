@@ -141,6 +141,7 @@ class DefaultValue(ColumnConstraint):
     value: Any = None
 
     def __str__(self) -> str:
+        # TODO: Adapt this to provide self.value as an argument to be escaped by sqlite.execute()
         return f'DEFAULT {self.value}' if self.value is not None else ''
 
 
@@ -153,7 +154,7 @@ class DefaultExpression(DefaultValue):
 
 
 @dataclass
-class TableColumn(metaclass=ABCMeta):
+class TableColumn(_IStringable, metaclass=ABCMeta):
     value: Any
 
     def __hash__(self):
@@ -173,6 +174,12 @@ class TableColumn(metaclass=ABCMeta):
     @abstractmethod
     def constraint(self) -> ColumnConstraint | None:
         pass
+
+    def __str__(self) -> str:
+        output = [self.column_name, self.data_type]
+        if self.constraint is not None:
+            output.append(self.constraint)
+        return ' '.join(output)
 
 
 __column_classes: Dict[Tuple[DataType, str, ColumnConstraint], Type[TableColumn]] = {}
