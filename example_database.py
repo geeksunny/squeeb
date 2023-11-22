@@ -15,7 +15,7 @@ SmrtyPntz = make_database_class('SmrtyPntz', 'music.db')
 
 @table(db_class=SmrtyPntz)
 class Artist(Model):
-    id = column(DataType.INTEGER, constraints=PrimaryKey(autoincrement=True, unique=True))
+    id = column(DataType.INTEGER, constraint=PrimaryKey(autoincrement=True, unique=True))
     spotify_id = column(DataType.TEXT)
     name = column(DataType.TEXT)
     spotify_genres = column(DataType.TEXT)
@@ -33,25 +33,25 @@ class Artist(Model):
 
 @table(db_class=SmrtyPntz)
 class Album(Model):
-    id = column(DataType.INTEGER, constraints=PrimaryKey(autoincrement=True))
+    id = column(DataType.INTEGER, constraint=PrimaryKey(autoincrement=True))
     spotify_id = column(DataType.TEXT)
     name = column(DataType.TEXT)
     year = column(DataType.INTEGER)
     genres = column(DataType.TEXT)
-    artist_id = column(DataType.INTEGER, constraints=ForeignKey(Artist, Artist.id))
+    artist_id = column(DataType.INTEGER, constraint=ForeignKey(Artist, Artist.id))
     spotify_genres = column(DataType.TEXT)
 
 
 @table(db_class=SmrtyPntz)
 class Track(Model):
-    id = column(DataType.INTEGER, constraints=PrimaryKey(autoincrement=True))
+    id = column(DataType.INTEGER, constraint=PrimaryKey(autoincrement=True))
     spotify_id = column(DataType.TEXT)
     filepath = column(DataType.TEXT)
     name = column(DataType.TEXT)
     duration = column(DataType.INTEGER)
-    artist_id = column(DataType.INTEGER, constraints=ForeignKey(Artist, Artist.id))
-    album_artist_id = column(DataType.INTEGER, constraints=ForeignKey(Artist, Artist.id))
-    album_id = column(DataType.INTEGER, constraints=ForeignKey(Album, Album.id))
+    artist_id = column(DataType.INTEGER, constraint=ForeignKey(Artist, Artist.id))
+    album_artist_id = column(DataType.INTEGER, constraint=ForeignKey(Artist, Artist.id))
+    album_id = column(DataType.INTEGER, constraint=ForeignKey(Album, Album.id))
     album_track_number = column(DataType.INTEGER)
     danceability = column(DataType.REAL)
     energy = column(DataType.REAL)

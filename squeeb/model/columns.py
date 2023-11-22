@@ -157,7 +157,7 @@ class TableColumn(metaclass=ABCMeta):
     value: Any
 
     def __hash__(self):
-        return hash((self.column_name, self.data_type, self.constraints, self.value))
+        return hash((self.column_name, self.data_type, self.constraint, self.value))
 
     @property
     @abstractmethod
@@ -171,29 +171,26 @@ class TableColumn(metaclass=ABCMeta):
 
     @property
     @abstractmethod
-    def constraints(self) -> Tuple[ColumnConstraint, ...]:
+    def constraint(self) -> ColumnConstraint | None:
         pass
 
 
-__column_classes: Dict[Tuple[DataType, str, Tuple[ColumnConstraint, ...]], Type[TableColumn]] = {}
+__column_classes: Dict[Tuple[DataType, str, ColumnConstraint], Type[TableColumn]] = {}
 
 
 def column(data_type: DataType, value: Any = None, column_name: str = None,
-           constraints: Tuple[ColumnConstraint, ...] | ColumnConstraint = None):
+           constraint: ColumnConstraint = None):
     """
     Creates a TableColumnClass with the given parameters. Stores the created class for repeat use.
     :param data_type: Data type of the table column.
     :param value: Initial value of the table column instance.
     :param column_name: Sqlite column name that this field will map to.
            If `None` is provided, the model's member variable name will be used.
-    :param constraints: Optional tuple of ColumnConstraint objects to attach to this column.
-           May also provide a single ColumnConstraint object.
+    :param constraint: Optional ColumnConstraint object to attach to this column.
     :return: An instance of the resulting TableColumnClass.
     """
-    if not isinstance(constraints, tuple):
-        constraints = (constraints, )
-    if (data_type, column_name, constraints) in __column_classes:
-        column_class = __column_classes[(data_type, column_name, constraints)]
+    if (data_type, column_name, constraint) in __column_classes:
+        column_class = __column_classes[(data_type, column_name, constraint)]
     else:
         class TableColumnClass(TableColumn):
 
@@ -206,9 +203,9 @@ def column(data_type: DataType, value: Any = None, column_name: str = None,
                 return data_type
 
             @property
-            def constraints(self) -> Tuple[ColumnConstraint, ...]:
-                return constraints
+            def constraint(self) -> ColumnConstraint | None:
+                return constraint
 
-        __column_classes[(data_type, column_name, constraints)] = TableColumnClass
+        __column_classes[(data_type, column_name, constraint)] = TableColumnClass
         column_class = TableColumnClass
     return column_class(value)

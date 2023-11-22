@@ -128,7 +128,7 @@ class _BaseQueryConditionSequence(_IQueryCondition):
 
     _conditions: List[_IQueryCondition | Junction] = []
 
-    def __init__(self, first_condition_or_sequence: Union[_IQueryCondition, _BaseQueryConditionSequence],
+    def __init__(self, first_condition_or_sequence: _IQueryCondition | _BaseQueryConditionSequence,
                  first_junction: Junction = None) -> None:
         if isinstance(first_condition_or_sequence, _BaseQueryConditionSequence):
             self._conditions = first_condition_or_sequence._conditions
@@ -142,7 +142,7 @@ class _BaseQueryConditionSequence(_IQueryCondition):
     def is_ready_for_condition(self) -> bool:
         return isinstance(self._conditions[-1], Junction)
 
-    def where(self, col_name_or_condition: Union[str, _BaseQueryCondition]) -> _MutableConditionMixin:
+    def where(self, col_name_or_condition: str | _BaseQueryCondition) -> _MutableConditionMixin:
         if isinstance(col_name_or_condition, _BaseQueryCondition):
             self._conditions.append(col_name_or_condition)
         elif isinstance(col_name_or_condition, str):

@@ -11,7 +11,7 @@ from typing import Type, Dict, List, ClassVar, TYPE_CHECKING
 from squeeb.common import ValueMapping
 from squeeb.query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
 from squeeb.query.queries import CreateTableQueryBuilder
-from .columns import TableColumn, PrimaryKey, ForeignKey
+from .columns import TableColumn, PrimaryKey, ForeignKey, ColumnConstraint
 
 if TYPE_CHECKING:
     from squeeb.db import Database
@@ -320,11 +320,11 @@ def _validate_foreign_keys(database: Database):
     for model in database.__class__.__tables__:
         for column_name in model.__mapping__:
             column: TableColumn = getattr(model, column_name)
-            for constraint in column.constraints:
-                if (isinstance(constraint, ForeignKey)
-                        and constraint.foreign_table_class not in database.__class__.__tables__):
-                    raise sqlite3.IntegrityError(
-                        f'Foreign key table `{str(model.__table_name__)}` is not associated with database `{database.__class__.__name__}`.')
+            constraint: ColumnConstraint = column.constraint
+            if (isinstance(constraint, ForeignKey)
+                    and constraint.foreign_table_class not in database.__class__.__tables__):
+                raise sqlite3.IntegrityError(
+                    f'Foreign key table `{str(model.__table_name__)}` is not associated with database `{database.__class__.__name__}`.')
 
 
 def _sort_models(models: List[Type[Model]]):
@@ -340,9 +340,9 @@ def _sort_models(models: List[Type[Model]]):
             foreign_key_map[model] = []
             for column_name in model.__mapping__:
                 column: TableColumn = getattr(model, column_name)
-                for constraint in column.constraints:
-                    if isinstance(constraint, ForeignKey):
-                        foreign_key_map[model].append(constraint.foreign_table_class)
+                constraint: ColumnConstraint = column.constraint
+                if isinstance(constraint, ForeignKey):
+                    foreign_key_map[model].append(constraint.foreign_table_class)
 
         return foreign_key_map[model]
 
