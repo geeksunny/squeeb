@@ -48,16 +48,18 @@ class _ICrud(object, metaclass=ABCMeta):
 class ModelMetaClass(ABCMeta):
 
     def __new__(metacls, cls, bases, classdict, **kwargs):
+        result_class = super().__new__(metacls, cls, bases, classdict, **kwargs)
         mapping = {}
         for name, value in classdict.items():
             if isinstance(value, TableColumn):
-                mapping[name] = value.column_name if value.column_name is not None else name
-        result_class = super().__new__(metacls, cls, bases, classdict, **kwargs)
+                if not hasattr(value, '__column_name__'):
+                    value.__class__.__column_name__ = name
+                mapping[name] = value.column_name
         result_class.__mapping__ = mapping
         return result_class
 
     def __setattr__(self, __name, __value):
-        if __name is '__mapping__':
+        if __name == '__mapping__':
             if isinstance(__value, Dict):
                 """When setting the column mapping, if a mapping already exists then the new mapping will be combined
                 with the old mapping. This ensures extended models will have a mapping for all inherited fields.
@@ -67,7 +69,7 @@ class ModelMetaClass(ABCMeta):
                 setattr(self, '__mapping_inverse__', FrozenDict(dict(map(reversed, __value.items()))))
             else:
                 raise TypeError("Column mapping must be a dictionary.")
-        elif __name is '__mapping_inverse__':
+        elif __name == '__mapping_inverse__':
             if not isinstance(__value, FrozenDict):
                 raise TypeError("Inverse column mapping must already be a frozen dictionary.")
         super().__setattr__(__name, __value)

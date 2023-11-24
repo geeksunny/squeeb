@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABCMeta, abstractmethod, ABC
 from dataclasses import dataclass, InitVar, field
 from enum import StrEnum
-from typing import Any, Tuple, Dict, Type, TYPE_CHECKING
+from typing import Any, Tuple, Dict, Type, TYPE_CHECKING, ClassVar
 
 from squeeb.common import Order
 from squeeb.util import _IStringable
@@ -153,17 +153,26 @@ class DefaultExpression(DefaultValue):
         return super().__getattribute__(__name)
 
 
+class TableColumnMetaClass(ABCMeta):
+
+    def __setattr__(self, __name, __value):
+        if __name == '__column_name__':
+            if hasattr(self, __name):
+                raise TypeError('Table column name cannot be overwritten once it has been set.')
+        super().__setattr__(__name, __value)
+
+
 @dataclass
-class TableColumn(_IStringable, metaclass=ABCMeta):
+class TableColumn(_IStringable, metaclass=TableColumnMetaClass):
+    __column_name__: ClassVar[str] = field(init=False)
     value: Any
 
     def __hash__(self):
         return hash((self.column_name, self.data_type, self.constraint, self.value))
 
     @property
-    @abstractmethod
     def column_name(self) -> str:
-        pass
+        return  self.__column_name__
 
     @property
     @abstractmethod
@@ -178,7 +187,7 @@ class TableColumn(_IStringable, metaclass=ABCMeta):
     def __str__(self) -> str:
         output = [self.column_name, self.data_type]
         if self.constraint is not None:
-            output.append(self.constraint)
+            output.append(str(self.constraint))
         return ' '.join(output)
 
 
@@ -199,11 +208,10 @@ def column(data_type: DataType, value: Any = None, column_name: str = None,
     if (data_type, column_name, constraint) in __column_classes:
         column_class = __column_classes[(data_type, column_name, constraint)]
     else:
-        class TableColumnClass(TableColumn):
+        if not isinstance(data_type, DataType):
+            raise TypeError('Column data_type must be a DataType object.')
 
-            @property
-            def column_name(self) -> str:
-                return column_name
+        class TableColumnClass(TableColumn):
 
             @property
             def data_type(self) -> DataType:
@@ -213,6 +221,8 @@ def column(data_type: DataType, value: Any = None, column_name: str = None,
             def constraint(self) -> ColumnConstraint | None:
                 return constraint
 
+        if column_name is not None:
+            TableColumnClass.__column_name__ = column_name
         __column_classes[(data_type, column_name, constraint)] = TableColumnClass
         column_class = TableColumnClass
     return column_class(value)
