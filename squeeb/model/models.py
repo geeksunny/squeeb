@@ -55,7 +55,16 @@ class ModelMetaClass(ABCMeta):
                 if not hasattr(value, '__column_name__'):
                     value.__class__.__column_name__ = name
                 mapping[name] = value.column_name
+                """Check for a column with the PrimaryKey constraint defined."""
+                if value.constraint is not None and isinstance(value.constraint, PrimaryKey):
+                    setattr(result_class, '__id_key__', name)
+                    setattr(result_class, '_id_col_name', value.column_name)
         result_class.__mapping__ = mapping
+        # TODO: Refactor in a way to accommodate tables relying on sqlite's built-in `rowid` value
+        #  in lieu of a primary key
+        if len(mapping) > 0 and not hasattr(result_class, '__id_key__'):
+            raise TypeError("Model class does not have a column defined as Primary Key.")
+
         return result_class
 
     def __setattr__(self, __name, __value):
@@ -81,7 +90,9 @@ class Model(_ICrud, metaclass=ModelMetaClass):
     __mapping__: ClassVar[Dict[str, str]]
     __mapping_inverse__: ClassVar[Dict[str, str]]
     __table_name__: ClassVar[str]
+    __id_key__: ClassVar[str]
     _db: ClassVar[Database]
+    _id_col_name: ClassVar[str]
     _initialized: ClassVar[bool]
 
     @classmethod
@@ -96,17 +107,7 @@ class Model(_ICrud, metaclass=ModelMetaClass):
         instance = super().__new__(cls)
         for name in instance.__mapping__:
             instance.__dict__[name] = deepcopy(getattr(instance, name))
-            """Check for a column with the PrimaryKey constraint defined."""
-            if instance.__dict__[name].constraints is not None:
-                for constraint in instance.__dict__[name].constraints:
-                    if isinstance(constraint, PrimaryKey):
-                        instance.__dict__['_id'] = instance.__dict__[name]
-                        instance.__dict__['_id_col_name'] = instance.__dict__[name].column_name \
-                            if instance.__dict__[name].column_name is not None else name
-        # TODO: Refactor in a way to accommodate tables relying on sqlite's built-in `rowid` value
-        #  in lieu of a primary key
-        if not hasattr(instance, '_id'):
-            raise TypeError("Model class does not have a column defined as Primary Key.")
+        instance._id = instance.__dict__[instance.__id_key__]
         return instance
 
     def __setattr__(self, __name, __value):
@@ -120,11 +121,11 @@ class Model(_ICrud, metaclass=ModelMetaClass):
 
     @property
     def id(self):
-        return getattr(self, '_id')
+        return self._id
 
     @property
     def id_col_name(self):
-        return getattr(self, '_id_col_name')
+        return self._id_col_name
 
     @property
     def table_name(self) -> str:
