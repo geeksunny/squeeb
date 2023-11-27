@@ -156,15 +156,17 @@ class DefaultExpression(DefaultValue):
 class TableColumnMetaClass(ABCMeta):
 
     def __setattr__(self, __name, __value):
-        if __name == '__column_name__':
+        if __name in ['__column_name__', '__data_type__', '__constraint__']:
             if hasattr(self, __name):
-                raise TypeError('Table column name cannot be overwritten once it has been set.')
+                raise TypeError(f'Table.{__name} cannot be overwritten once it has been set.')
         super().__setattr__(__name, __value)
 
 
 @dataclass
 class TableColumn(_IStringable, metaclass=TableColumnMetaClass):
     __column_name__: ClassVar[str] = field(init=False)
+    __data_type__: ClassVar[DataType] = field(init=False)
+    __constraint__: ClassVar[ColumnConstraint] = field(init=False)
     value: Any
 
     def __hash__(self):
@@ -172,17 +174,15 @@ class TableColumn(_IStringable, metaclass=TableColumnMetaClass):
 
     @property
     def column_name(self) -> str:
-        return  self.__column_name__
+        return self.__column_name__
 
     @property
-    @abstractmethod
     def data_type(self) -> DataType:
-        pass
+        return self.__data_type__
 
     @property
-    @abstractmethod
     def constraint(self) -> ColumnConstraint | None:
-        pass
+        return self.__constraint__
 
     def __str__(self) -> str:
         output = [self.column_name, self.data_type]
@@ -212,17 +212,12 @@ def column(data_type: DataType, value: Any = None, column_name: str = None,
             raise TypeError('Column data_type must be a DataType object.')
 
         class TableColumnClass(TableColumn):
-
-            @property
-            def data_type(self) -> DataType:
-                return data_type
-
-            @property
-            def constraint(self) -> ColumnConstraint | None:
-                return constraint
+            pass
 
         if column_name is not None:
             TableColumnClass.__column_name__ = column_name
+        TableColumnClass.__data_type__ = data_type
+        TableColumnClass.__constraint__ = constraint
         __column_classes[(data_type, column_name, constraint)] = TableColumnClass
         column_class = TableColumnClass
     return column_class(value)
