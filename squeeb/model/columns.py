@@ -169,6 +169,19 @@ class TableColumn(_IStringable, metaclass=TableColumnMetaClass):
     __constraint__: ClassVar[ColumnConstraint] = field(init=False)
     value: Any
 
+    @classmethod
+    def with_name(cls, column_name: str):
+        if hasattr(cls, '__column_name__'):
+            if cls.__column_name__ != column_name:
+                raise ValueError(f'TableColumn already has name assigned and cannot be extended: {cls.__column_name__}')
+            return cls
+        else:
+            class TableColumnWithName(cls):
+                pass
+
+            TableColumnWithName.__column_name__ = column_name
+            return TableColumnWithName
+
     def __hash__(self):
         return hash((self.column_name, self.data_type, self.constraint, self.value))
 
@@ -195,7 +208,7 @@ __column_classes: Dict[Tuple[DataType, str, ColumnConstraint], Type[TableColumn]
 
 
 def column(data_type: DataType, value: Any = None, column_name: str = None,
-           constraint: ColumnConstraint = None):
+           constraint: ColumnConstraint = None) -> TableColumn:
     """
     Creates a TableColumnClass with the given parameters. Stores the created class for repeat use.
     :param data_type: Data type of the table column.
@@ -221,3 +234,16 @@ def column(data_type: DataType, value: Any = None, column_name: str = None,
         __column_classes[(data_type, column_name, constraint)] = TableColumnClass
         column_class = TableColumnClass
     return column_class(value)
+
+
+def copy_column(column: TableColumn, new_name: str, use_existing: bool = True) -> TableColumn:
+    column_class: Type[TableColumn] = column.__class__
+    if (column_class.__data_type__, new_name, column_class.__constraint__) in __column_classes:
+        if use_existing is True:
+            return __column_classes[(column_class.__data_type__, new_name, column_class.__constraint__)](column.value)
+        else:
+            raise ValueError('This column definition already exists.')
+    else:
+        copied_column_class = column_class.with_name(new_name)
+        __column_classes[(column_class.__data_type__, new_name, column_class.__constraint__)] = copied_column_class
+        return copied_column_class(column.value)

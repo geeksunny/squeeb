@@ -11,7 +11,7 @@ from typing import Type, Dict, List, ClassVar, TYPE_CHECKING
 from squeeb.common import ValueMapping
 from squeeb.query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
 from squeeb.query.queries import CreateTableQueryBuilder
-from .columns import TableColumn, PrimaryKey, ForeignKey, ColumnConstraint
+from .columns import TableColumn, PrimaryKey, ForeignKey, ColumnConstraint, copy_column
 
 if TYPE_CHECKING:
     from squeeb.db import Database
@@ -53,7 +53,8 @@ class ModelMetaClass(ABCMeta):
         for name, value in classdict.items():
             if isinstance(value, TableColumn):
                 if not hasattr(value, '__column_name__'):
-                    value.__class__.__column_name__ = name
+                    value = copy_column(value, name)
+                    setattr(result_class, name, value)
                 mapping[name] = value.column_name
                 """Check for a column with the PrimaryKey constraint defined."""
                 if value.constraint is not None and isinstance(value.constraint, PrimaryKey):
