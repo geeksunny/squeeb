@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from abc import ABCMeta, abstractmethod, ABC
+from abc import abstractmethod, ABC
 from dataclasses import dataclass, InitVar, field
 from enum import StrEnum
 from typing import Any, Tuple, Dict, Type, TYPE_CHECKING, ClassVar
 
 from squeeb.common import Order
-from squeeb.util import _IStringable
+from squeeb.util import _IStringable, ABCProtectedClassVarsMeta
 
 if TYPE_CHECKING:
     from .models import Model
@@ -153,17 +153,8 @@ class DefaultExpression(DefaultValue):
         return super().__getattribute__(__name)
 
 
-class TableColumnMetaClass(ABCMeta):
-
-    def __setattr__(self, __name, __value):
-        if __name in ['__column_name__', '__data_type__', '__constraint__']:
-            if hasattr(self, __name):
-                raise TypeError(f'Table.{__name} cannot be overwritten once it has been set.')
-        super().__setattr__(__name, __value)
-
-
 @dataclass
-class TableColumn(_IStringable, metaclass=TableColumnMetaClass):
+class TableColumn(_IStringable, metaclass=ABCProtectedClassVarsMeta):
     __column_name__: ClassVar[str] = field(init=False)
     __data_type__: ClassVar[DataType] = field(init=False)
     __constraint__: ClassVar[ColumnConstraint] = field(init=False)
