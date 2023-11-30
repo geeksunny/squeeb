@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from typing import List
-
-from squeeb import SelectQueryBuilder
 from squeeb.db import make_database_class
 from squeeb.model import column, DataType, PrimaryKey, ForeignKey
 from squeeb.model.decorators import table
+from squeeb.model.index import TableIndex, IndexedColumn
 from squeeb.model.models import Model
-
 
 
 SmrtyPntz = make_database_class('SmrtyPntz', 'music.db')
@@ -20,6 +17,8 @@ class Artist(Model):
     name = column(DataType.TEXT)
     spotify_genres = column(DataType.TEXT)
     spotify_popularity = column(DataType.INTEGER)
+
+    artist_names = TableIndex([IndexedColumn(name)], is_unique=True)
 
     # def needs_split(self) -> bool:
     #     return 'album_artist' in self
@@ -40,6 +39,8 @@ class Album(Model):
     genres = column(DataType.TEXT)
     artist_id = column(DataType.INTEGER, constraint=ForeignKey(Artist, Artist.id))
     spotify_genres = column(DataType.TEXT)
+
+    artist_name_year = TableIndex([IndexedColumn(name), IndexedColumn(year), IndexedColumn(artist_id)], is_unique=True)
 
 
 @table(db_class=SmrtyPntz)

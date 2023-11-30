@@ -12,6 +12,7 @@ from squeeb.common import ValueMapping
 from squeeb.query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
 from squeeb.query.queries import CreateTableQueryBuilder
 from .columns import TableColumn, PrimaryKey, ForeignKey, ColumnConstraint, copy_column
+from .index import TableIndex
 
 if TYPE_CHECKING:
     from squeeb.db import Database
@@ -50,6 +51,7 @@ class ModelMetaClass(ABCMeta):
     def __new__(metacls, cls, bases, classdict, **kwargs):
         result_class = super().__new__(metacls, cls, bases, classdict, **kwargs)
         mapping = {}
+        indexes = []
         for name, value in classdict.items():
             if isinstance(value, TableColumn):
                 if not hasattr(value, '__column_name__'):
@@ -60,7 +62,11 @@ class ModelMetaClass(ABCMeta):
                 if value.constraint is not None and isinstance(value.constraint, PrimaryKey):
                     setattr(result_class, '__id_key__', name)
                     setattr(result_class, '_id_col_name', value.column_name)
+            elif isinstance(value, TableIndex):
+                value._setup(result_class, name)
+                indexes.append(value)
         result_class.__mapping__ = mapping
+        result_class.__indexes__ = indexes
         # TODO: Refactor in a way to accommodate tables relying on sqlite's built-in `rowid` value
         #  in lieu of a primary key
         if len(mapping) > 0 and not hasattr(result_class, '__id_key__'):
@@ -82,6 +88,8 @@ class ModelMetaClass(ABCMeta):
         elif __name == '__mapping_inverse__':
             if not isinstance(__value, FrozenDict):
                 raise TypeError("Inverse column mapping must already be a frozen dictionary.")
+        elif __name == '__indexes__':
+            __value = frozenset(__value)
         super().__setattr__(__name, __value)
 
 
@@ -90,6 +98,7 @@ class Model(_ICrud, metaclass=ModelMetaClass):
 
     __mapping__: ClassVar[Dict[str, str]]
     __mapping_inverse__: ClassVar[Dict[str, str]]
+    __indexes__: ClassVar[List[TableIndex]]
     __table_name__: ClassVar[str]
     __id_key__: ClassVar[str]
     _db: ClassVar[Database]
@@ -160,6 +169,11 @@ class Model(_ICrud, metaclass=ModelMetaClass):
             #     init_result = DbOperationResult(error=DbOperationError("Unknown error encountered."))
             # if not init_result.success:
             #     raise RuntimeError("The database table failed to be created.")
+
+            if len(cls.__indexes__) > 0:
+                for index in cls.__indexes__:
+                    # TODO: Create and execute CreateIndexQueryBuilders for each index
+                    pass
         else:
             print(f'Table "{cls.__table_name__}" HAS ALREADY BEEN created!')
 
