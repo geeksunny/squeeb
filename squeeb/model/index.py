@@ -1,13 +1,14 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, InitVar
 from typing import List, Type, TYPE_CHECKING
 
 from squeeb.common import Order
-from squeeb.util import _IStringable
+from squeeb.model import TableColumn
+from squeeb.util import _IStringable, FrozenList
 
 if TYPE_CHECKING:
-    from squeeb.model import Model, TableColumn
+    from squeeb.model import Model
 
 
 @dataclass
@@ -33,13 +34,26 @@ class IndexedColumn(_IStringable):
 @dataclass(frozen=True)
 class TableIndex:
     table_model: Type[Model] = field(init=False)
-    columns: List[IndexedColumn]
+    _columns: InitVar[List[IndexedColumn | TableColumn]]
+    columns: List[IndexedColumn] = field(init=False)
     index_name: str = None
     is_unique: bool = False
     if_not_exists: bool = False
 
     # https://www.sqlite.org/lang_createindex.html
     # TODO: Implement `WHERE expr`
+
+    def __post_init__(self, _columns: List[IndexedColumn | TableColumn]):
+        """Prepping `columns` field."""
+        result = []
+        for column in _columns:
+            if isinstance(column, TableColumn):
+                column = IndexedColumn(column)
+            elif not isinstance(column, IndexedColumn):
+                raise TypeError('Column definition must be of TableColumn or IndexedColumn type.')
+            if column not in result:
+                result.append(column)
+        object.__setattr__(self, 'columns', FrozenList(result))
 
     def __hash__(self):
         return hash((self.table_model, hash(tuple(self.columns)), self.index_name, self.is_unique, self.if_not_exists))
