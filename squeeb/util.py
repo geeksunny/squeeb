@@ -1,6 +1,6 @@
 import re
 from abc import ABCMeta, abstractmethod
-from typing import get_type_hints, List, ClassVar, get_origin
+from typing import get_type_hints, List, ClassVar, get_origin, overload, Iterable, TypeVar, SupportsIndex
 
 
 def camel_to_snake_case(value: str, lowercase: bool = False, uppercase: bool = False):
@@ -47,10 +47,32 @@ class ProtectedClassVarsMeta(type):
 
     def __setattr__(self, __name, __value):
         if __name in self.__class_vars and hasattr(self, __name):
-            raise TypeError(f'{self.__name__}.{__name} cannot be overwritten once it has been set.')
+            raise AttributeError(f'{self.__name__}.{__name} cannot be overwritten once it has been set.')
         super().__setattr__(__name, __value)
 
 
 class ABCProtectedClassVarsMeta(ABCMeta, ProtectedClassVarsMeta):
     """Composite metaclass that combines Abstract Base Classes with ProtectedClassVarsMeta functionality."""
     pass
+
+
+_T = TypeVar('_T')
+
+
+class FrozenList(list):
+    """
+    A subclass of a standard List object that cannot have indexes set or deleted after initial creation.
+    Values can only be set in the constructor.
+    """
+
+    @overload
+    def __setitem__(self, __i: SupportsIndex, __o: _T) -> None: ...
+
+    @overload
+    def __setitem__(self, __s: slice, __o: Iterable[_T]) -> None: ...
+
+    def __setitem__(self, __i, __o):
+        raise AttributeError('List is frozen and cannot be modified.')
+
+    def __delitem__(self, __i):
+        raise AttributeError('List is frozen and cannot be modified.')
