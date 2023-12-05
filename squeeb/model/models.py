@@ -11,6 +11,7 @@ from typing import Type, Dict, List, ClassVar, TYPE_CHECKING
 from squeeb.common import ValueMapping
 from squeeb.query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
 from squeeb.query.queries import CreateTableQueryBuilder
+from squeeb.util import FrozenList
 from .columns import TableColumn, PrimaryKey, ForeignKey, ColumnConstraint, copy_column
 from .index import TableIndex
 
@@ -46,7 +47,23 @@ class _ICrud(object, metaclass=ABCMeta):
         pass
 
 
+class ModelNamespace(dict):
+    """
+    Model Namespace class to handle setting default column names at model class definition.
+    """
+
+    def __setitem__(self, __key, __value):
+        if isinstance(__value, TableColumn):
+            if not hasattr(__value, '__column_name__'):
+                __value = copy_column(__value, __key)
+        super().__setitem__(__key, __value)
+
+
 class ModelMetaClass(ABCMeta):
+
+    @classmethod
+    def __prepare__(metacls, __name, __bases, **kwds):
+        return ModelNamespace(**kwds)
 
     def __new__(metacls, cls, bases, classdict, **kwargs):
         result_class = super().__new__(metacls, cls, bases, classdict, **kwargs)
@@ -54,9 +71,6 @@ class ModelMetaClass(ABCMeta):
         indexes = []
         for name, value in classdict.items():
             if isinstance(value, TableColumn):
-                if not hasattr(value, '__column_name__'):
-                    value = copy_column(value, name)
-                    setattr(result_class, name, value)
                 mapping[name] = value.column_name
                 """Check for a column with the PrimaryKey constraint defined."""
                 if value.constraint is not None and isinstance(value.constraint, PrimaryKey):
@@ -89,7 +103,7 @@ class ModelMetaClass(ABCMeta):
             if not isinstance(__value, FrozenDict):
                 raise TypeError("Inverse column mapping must already be a frozen dictionary.")
         elif __name == '__indexes__':
-            __value = frozenset(__value)
+            __value = FrozenList(getattr(self, __name) + __value) if hasattr(self, __name) else FrozenList(__value)
         super().__setattr__(__name, __value)
 
 
