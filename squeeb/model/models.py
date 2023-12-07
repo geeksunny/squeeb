@@ -115,7 +115,7 @@ class Model(_ICrud, metaclass=ModelMetaClass):
     __indexes__: ClassVar[List[TableIndex]]
     __table_name__: ClassVar[str]
     __id_key__: ClassVar[str]
-    _db: ClassVar[Database]
+    _db: ClassVar[Type[Database] | Database]
     _id_col_name: ClassVar[str]
     _initialized: ClassVar[bool]
 
@@ -129,6 +129,11 @@ class Model(_ICrud, metaclass=ModelMetaClass):
     def __new__(cls, *more):
         """Copies new instances of the model's default column objects."""
         instance = super().__new__(cls)
+        try:
+            if type(cls._db) is type:
+                cls._db = cls._db()
+        except AttributeError as e:
+            raise AttributeError("Database handler for this model has not been registered.")
         for name in instance.__mapping__:
             instance.__dict__[name] = deepcopy(getattr(instance, name))
         instance._id = instance.__dict__[instance.__id_key__]

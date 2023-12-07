@@ -25,18 +25,11 @@ def table(cls: Type[Model] = None, db_class: Type[Database] = None, table_name: 
     def wrap(clss):
         _table_name = table_name if table_name is not None else f'{camel_to_snake_case(clss.__name__, lowercase=True)}s'
 
-        class TableClass(clss):
+        clss.__table_name__ = _table_name
+        clss._db = db_class
 
-            def __init__(self) -> None:
-                if not hasattr(self.__class__, '_db') or self.__class__._db is None:
-                    self.__class__._db = db_class()
-                    if self.__class__._db is None:
-                        raise ValueError("Database handler for this model has not been registered.")
-                super().__init__()
-
-        TableClass.__name__ = TableClass.__qualname__ = clss.__name__
-        TableClass.__table_name__ = _table_name
-        db_class.register_table(TableClass)
-        return TableClass
+        print(f'__TABLE CLASS__ . __TABLE NAME__ is {clss.__name__}.{clss.__table_name__}')
+        db_class.register_table(clss)
+        return clss
 
     return wrap if cls is None else wrap(cls)
