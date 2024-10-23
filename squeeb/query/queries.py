@@ -3,7 +3,7 @@ from __future__ import annotations
 import string
 from abc import ABCMeta, abstractmethod
 from dataclasses import dataclass
-from enum import Enum
+from enum import Enum, StrEnum
 from typing import Tuple, Any, List, TypeVar, Self, Type, TYPE_CHECKING
 
 from squeeb.common import ValueMapping
@@ -103,7 +103,81 @@ class AbstractQueryBuilder(object, metaclass=ABCMeta):
 QueryBuilder = TypeVar("QueryBuilder", bound=AbstractQueryBuilder)
 
 
+class TransactionBehavior(StrEnum):
+    DEFERRED = "DEFERRED"
+    IMMEDIATE = "IMMEDIATE"
+    EXCLUSIVE = "EXCLUSIVE"
+
+
+class BeginTransactionQueryBuilder(AbstractQueryBuilder):
+
+    def __init__(self, behavior: TransactionBehavior = None) -> None:
+        super().__init__('')
+        self._behavior = behavior
+
+    def _get_args_needed(self) -> Tuple[_QueryArgs] | tuple:
+        return ()
+
+    def _get_query_str(self) -> str:
+        return f'BEGIN {self._behavior.value if self._behavior is not None else ''} TRANSACTION'
+
+
+class CommitQueryBuilder(AbstractQueryBuilder):
+
+    def __init__(self) -> None:
+        super().__init__('')
+
+    def _get_args_needed(self) -> Tuple[_QueryArgs] | tuple:
+        return ()
+
+    def _get_query_str(self) -> str:
+        return 'COMMIT TRANSACTION'
+
+
+class RollbackQueryBuilder(AbstractQueryBuilder):
+
+    def __init__(self, savepoint_name: str = None) -> None:
+        super().__init__('')
+        self._savepoint_name = savepoint_name
+
+    def _get_args_needed(self) -> Tuple[_QueryArgs] | tuple:
+        return ()
+
+    def _get_query_str(self) -> str:
+        query = 'ROLLBACK'
+        if self._savepoint_name is not None:
+            query += f' TO {self._savepoint_name}'
+        return query
+
+
+class SavepointQueryBuilder(AbstractQueryBuilder):
+
+    def __init__(self, savepoint_name: str) -> None:
+        super().__init__('')
+        self._savepoint_name = savepoint_name
+
+    def _get_args_needed(self) -> Tuple[_QueryArgs] | tuple:
+        return ()
+
+    def _get_query_str(self) -> str:
+        return f'SAVEPOINT {self._savepoint_name}'
+
+
+class ReleaseQueryBuilder(AbstractQueryBuilder):
+
+    def __init__(self, savepoint_name: str) -> None:
+        super().__init__('')
+        self._savepoint_name = savepoint_name
+
+    def _get_args_needed(self) -> Tuple[_QueryArgs] | tuple:
+        return ()
+
+    def _get_query_str(self) -> str:
+        return f'RELEASE {self._savepoint_name}'
+
+
 class CreateIndexQueryBuilder(AbstractQueryBuilder):
+
     def __init__(self, table_index: TableIndex) -> None:
         super().__init__(table_index.table_model.__table_name__)
         self._index: TableIndex = table_index
