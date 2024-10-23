@@ -29,7 +29,6 @@ class _QueryArgs(Enum):
 
 
 class AbstractQueryBuilder(object, metaclass=ABCMeta):
-
     _table_name: str = None
     _value_map: _QueryValueMap | _QueryValueMapGroup = None
     _where_conditions: _IQueryCondition = None
@@ -38,7 +37,6 @@ class AbstractQueryBuilder(object, metaclass=ABCMeta):
                  table_name: str,
                  value_map: ValueMapping | List[ValueMapping] = None,
                  where_condition: QueryCondition | QueryConditionSequence | QueryConditionGroup = None) -> None:
-        super().__init__()
         self._table_name = table_name
         if value_map is not None:
             self.set_value(value_map)
@@ -53,11 +51,11 @@ class AbstractQueryBuilder(object, metaclass=ABCMeta):
             super().__setattr__(name, value)
 
     @abstractmethod
-    def _get_query_str(self) -> str:
+    def _get_args_needed(self) -> Tuple[_QueryArgs] | tuple:
         pass
 
     @abstractmethod
-    def _get_args_needed(self) -> Tuple[_QueryArgs]:
+    def _get_query_str(self) -> str:
         pass
 
     def set_value(self, value_obj: ValueMapping | List[ValueMapping]) -> Self:
@@ -106,7 +104,7 @@ QueryBuilder = TypeVar("QueryBuilder", bound=AbstractQueryBuilder)
 
 class CreateIndexQueryBuilder(AbstractQueryBuilder):
 
-    def _get_args_needed(self) -> Tuple[_QueryArgs]:
+    def _get_args_needed(self) -> Tuple[_QueryArgs] | tuple:
         pass
 
     def _get_query_str(self) -> str:
@@ -158,8 +156,8 @@ class CreateTableQueryBuilder(AbstractQueryBuilder):
             columns.append(str(column))
         return ', '.join(columns)
 
-    def _get_args_needed(self) -> Tuple[_QueryArgs]:
-        pass
+    def _get_args_needed(self) -> Tuple[_QueryArgs] | tuple:
+        return ()
 
     def _get_query_str(self) -> str:
         tmpl = string.Template('CREATE $temp TABLE $if_not_exists $table ($columns) $options')
@@ -179,7 +177,7 @@ class CreateTableQueryBuilder(AbstractQueryBuilder):
 
 class DropTableQueryBuilder(AbstractQueryBuilder):
 
-    def _get_args_needed(self) -> Tuple[_QueryArgs]:
+    def _get_args_needed(self) -> Tuple[_QueryArgs] | tuple:
         pass
 
     def _get_query_str(self) -> str:
@@ -249,7 +247,7 @@ class PragmaQueryBuilder(AbstractQueryBuilder):
         self._target = target
         self._value = value
 
-    def _get_args_needed(self) -> Tuple[_QueryArgs]:
+    def _get_args_needed(self) -> Tuple[_QueryArgs] | tuple:
         return []
 
     def _get_query_str(self) -> str:
