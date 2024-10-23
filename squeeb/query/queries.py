@@ -12,6 +12,7 @@ from squeeb.query.conditions import _IQueryCondition, QueryConditionSequence, Qu
 from squeeb.query.values import _QueryValueMap, _QueryValueMapGroup
 
 if TYPE_CHECKING:
+    from squeeb.model.index import TableIndex
     from squeeb.model.models import Model, TableColumn
 
 
@@ -103,16 +104,37 @@ QueryBuilder = TypeVar("QueryBuilder", bound=AbstractQueryBuilder)
 
 
 class CreateIndexQueryBuilder(AbstractQueryBuilder):
+    def __init__(self, table_index: TableIndex) -> None:
+        super().__init__(table_index.table_model.__table_name__)
+        self._index: TableIndex = table_index
+        self._unique: bool = table_index.is_unique
+        self._if_not_exists: bool = table_index.if_not_exists
+
+    def unique(self) -> Self:
+        self._unique = True
+        return self
+
+    def if_not_exists(self) -> Self:
+        self._if_not_exists = True
+        return self
+
+    def _get_columns_str(self) -> str:
+        columns = []
+        for column in self._index.columns:
+            columns.append(f'"{column.column.column_name}"')
+        return ', '.join(columns)
 
     def _get_args_needed(self) -> Tuple[_QueryArgs] | tuple:
-        pass
+        return ()
 
     def _get_query_str(self) -> str:
-        tmpl = string.Template('INSERT INTO $table $columns VALUES $values')
+        tmpl = string.Template('CREATE $unique INDEX $if_not_exists "$name" ON "$table" ($columns)')
         return tmpl.substitute({
+            "unique": 'UNIQUE' if self._unique is True else '',
+            "if_not_exists": 'IF NOT EXISTS' if self._if_not_exists is True else '',
+            "name": self._index.index_name,
             "table": self._table_name,
-            "columns": self._get_columns_str(),
-            "values": self._get_values_str()
+            "columns": self._get_columns_str()
         })
 
 
