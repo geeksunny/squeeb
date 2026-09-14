@@ -10,7 +10,7 @@ from typing import Type, Dict, List, ClassVar, TYPE_CHECKING
 
 from squeeb.common import ValueMapping
 from squeeb.query import InsertQueryBuilder, UpdateQueryBuilder, DeleteQueryBuilder, SelectQueryBuilder, where
-from squeeb.query.queries import CreateTableQueryBuilder
+from squeeb.query.queries import CreateTableQueryBuilder, CreateIndexQueryBuilder
 from squeeb.util import FrozenList
 from .columns import TableColumn, PrimaryKey, ForeignKey, ColumnConstraint, copy_column
 from .index import TableIndex
@@ -27,9 +27,13 @@ class DbOperationError(Exception):
 class DbOperationResult:
     error: DbOperationError | str = None
 
+    def __post_init__(self):
+        if isinstance(self.error, str):
+            object.__setattr__(self, 'error', DbOperationError(self.error))
+
     @property
     def success(self):
-        return self.error is not None
+        return self.error is None
 
 
 class _ICrud(object, metaclass=ABCMeta):
@@ -166,35 +170,34 @@ class Model(_ICrud, metaclass=ModelMetaClass):
 
     @classmethod
     def _create_table_query(cls) -> CreateTableQueryBuilder:
-        # TODO: Implement the rest of this query builder once the class is completed.
-        return CreateTableQueryBuilder(cls.__table_name__)
+        return CreateTableQueryBuilder(cls, if_not_exists=True)
 
     @classmethod
-    def init_table(cls):
-        # TODO: NEEDS TO BE TESTED WHEN CreateTableQueryBuilder IS IMPLEMENTED!
+    def _create_index_queries(cls) -> List[CreateIndexQueryBuilder]:
+        queries = []
+        for index in cls.__indexes__:
+            queries.append(CreateIndexQueryBuilder(index))
+        return queries
+
+    @classmethod
+    def init_table(cls, db):
         if not hasattr(cls, '_initialized') or cls._initialized is not True:
             print(f'Table "{cls.__table_name__}" is being created!')
-            pass
+            #
+            q = cls._create_table_query()
+            print(f'Create Table Query: {q.build().query}')
+            result = db.exec_query_no_result(q)
+            if not result.success:
+                raise RuntimeError("The database table failed to be created.")
+            for iq in cls._create_index_queries():
+                print(f'Create Index Query: {iq.build().query}')
+                result = db.exec_query_no_result(iq)
+                if not result.success:
+                    raise RuntimeError("The database table index failed to be created.")
             cls._initialized = True
-            pass
-            # q = self._create_table_query()
-            # result = self._db.exec_query_no_result(q)
-            # if isinstance(result, sqlite3.Error):
-            #     init_result = DbOperationResult(error=DbOperationError(result))
-            # elif isinstance(result, int):
-            #     self.__class__._initialized = True
-            #     init_result = DbOperationResult()
-            # else:
-            #     init_result = DbOperationResult(error=DbOperationError("Unknown error encountered."))
-            # if not init_result.success:
-            #     raise RuntimeError("The database table failed to be created.")
-
-            if len(cls.__indexes__) > 0:
-                for index in cls.__indexes__:
-                    # TODO: Create and execute CreateIndexQueryBuilders for each index
-                    pass
         else:
             print(f'Table "{cls.__table_name__}" HAS ALREADY BEEN created!')
+        return True
 
     def delete(self) -> DbOperationResult:
         # TODO: Review and confirm if this still works after AbstractModel class refactor.

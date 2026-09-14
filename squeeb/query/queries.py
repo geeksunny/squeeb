@@ -221,7 +221,7 @@ class CreateTableQueryBuilder(AbstractQueryBuilder):
 
     def __init__(self, table_model: Type[Model], is_temporary: bool = False, if_not_exists: bool = False,
                  strict: bool = False, without_rowid: bool = False) -> None:
-        super().__init__('')
+        super().__init__(table_model.__table_name__)
         self._table_model = table_model
         # TODO: Move `is_temporary`, `strict`, `without_rowid` into Model class.
         self._is_temporary = is_temporary

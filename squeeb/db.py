@@ -16,7 +16,7 @@ class BaseDbHandlerResult:
 
     @property
     def success(self):
-        return self.error is not None
+        return self.error is None
 
 
 @dataclass(frozen=True)
@@ -68,7 +68,7 @@ class Database(metaclass=Singleton):
         _validate_foreign_keys(self)
         models = _sort_models(self.__tables__)
         for model in models:
-            success = model.init_table()
+            success = model.init_table(self)
             if not success:
                 return False
         return True
@@ -102,7 +102,7 @@ class Database(metaclass=Singleton):
 
     def exec_query_no_result(self, query_builder: QueryBuilder) -> DbHandlerNoResult:
         query = query_builder.build()
-        if 'error' in query:
+        if query.error is not None:
             logger.error('QUERY BUILD ERROR: %s', query.error)
             return DbHandlerNoResult(error=query.error)
         return self._exec_raw_query_no_result(query.query, query.args)
