@@ -178,7 +178,7 @@ class TableColumn(_IStringable, metaclass=ABCProtectedClassVarsMeta):
 
     @property
     def column_name(self) -> str:
-        return self.__column_name__
+        return self.__column_name__ if hasattr(self, '__column_name__') else ''
 
     @property
     def data_type(self) -> DataType:

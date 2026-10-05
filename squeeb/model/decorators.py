@@ -28,7 +28,6 @@ def table(cls: Type[Model] = None, db_class: Type[Database] = None, table_name: 
         clss.__table_name__ = _table_name
         clss._db = db_class
 
-        print(f'__TABLE CLASS__ . __TABLE NAME__ is {clss.__name__}.{clss.__table_name__}')
         db_class.register_table(clss)
         return clss
 

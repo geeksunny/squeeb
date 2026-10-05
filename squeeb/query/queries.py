@@ -344,7 +344,7 @@ class PragmaQueryBuilder(AbstractQueryBuilder):
         self._value = value
 
     def _get_args_needed(self) -> Tuple[_QueryArgs] | tuple:
-        return []
+        return ()
 
     def _get_query_str(self) -> str:
         if self._target is not None:

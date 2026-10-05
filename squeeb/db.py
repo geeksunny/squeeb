@@ -57,6 +57,9 @@ class Database(metaclass=Singleton):
         # Create tables if they do not exist.
         self._init_tables()
 
+    def __init_subclass__(cls):
+        cls.__tables__ = []
+
     def __del__(self):
         self.close()
 
@@ -109,14 +112,14 @@ class Database(metaclass=Singleton):
 
     def exec_query_single_result(self, query_builder: QueryBuilder) -> DbHandlerSingleResult:
         query = query_builder.build()
-        if 'error' in query:
+        if query.error is not None:
             logger.error('QUERY BUILD ERROR: %s', query.error)
             return DbHandlerSingleResult(error=query.error)
         return self._exec_raw_query_single_result(query.query, query.args)
 
     def exec_query_all_results(self, query_builder: QueryBuilder) -> DbHandlerMultiResult:
         query = query_builder.build()
-        if 'error' in query:
+        if query.error is not None:
             logger.error('QUERY BUILD ERROR: %s', query.error)
             return DbHandlerMultiResult(error=query.error)
         return self._exec_raw_query_all_results(query.query, query.args)
