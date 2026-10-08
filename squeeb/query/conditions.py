@@ -22,7 +22,7 @@ class _IQueryCondition(_IStringable, _QueryValueHandlerMixin):
     pass
 
 
-class _IQueryJuncture(object, metaclass=ABCMeta):
+class _IQueryJuncture(metaclass=ABCMeta):
 
     @property
     @abstractmethod
@@ -65,7 +65,7 @@ class _BaseQueryCondition(_IQueryCondition):
         return '%s %s %s' % (self._column_name, self._operator.value, value)
 
 
-class _MutableConditionMixin(object, metaclass=ABCMeta):
+class _MutableConditionMixin(metaclass=ABCMeta):
 
     @abstractmethod
     def _set_condition(self, operator, value):

@@ -78,7 +78,8 @@ class Database(metaclass=Singleton):
 
     def _exec_raw_query_no_result(self, query_str: str, args: Any = None) -> DbHandlerNoResult:
         try:
-            with closing(self._conn.cursor()) as c:
+            with self._conn:
+                c = self._conn.cursor()
                 c.execute(query_str, args if args is not None else ())
                 return DbHandlerNoResult(c.rowcount)
         except sqlite3.Error as e:
@@ -87,7 +88,8 @@ class Database(metaclass=Singleton):
 
     def _exec_raw_query_single_result(self, query_str: str, args: Any = None) -> DbHandlerSingleResult:
         try:
-            with closing(self._conn.cursor()) as c:
+            with self._conn:
+                c = self._conn.cursor()
                 c.execute(query_str, args if args is not None else ())
                 return DbHandlerSingleResult(c.fetchone())
         except sqlite3.Error as e:
@@ -96,7 +98,8 @@ class Database(metaclass=Singleton):
 
     def _exec_raw_query_all_results(self, query_str: str, args: Tuple[Any] = None) -> DbHandlerMultiResult:
         try:
-            with closing(self._conn.cursor()) as c:
+            with self._conn:
+                c = self._conn.cursor()
                 c.execute(query_str, args if args is not None else ())
                 return DbHandlerMultiResult(c.fetchall())
         except sqlite3.Error as e:

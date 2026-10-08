@@ -36,7 +36,7 @@ class DbOperationResult:
         return self.error is None
 
 
-class _ICrud(object, metaclass=ABCMeta):
+class _ICrud(metaclass=ABCMeta):
 
     @abstractmethod
     def delete(self) -> DbOperationResult:
@@ -134,7 +134,7 @@ class Model(_ICrud, metaclass=ModelMetaClass):
         """Copies new instances of the model's default column objects."""
         instance = super().__new__(cls)
         try:
-            if type(cls._db) is type:
+            if isinstance(cls._db, type):
                 cls._db = cls._db()
         except AttributeError as e:
             raise AttributeError("Database handler for this model has not been registered.")

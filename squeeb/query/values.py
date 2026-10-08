@@ -9,7 +9,7 @@ from squeeb.common import ValueMapping
 QueryValues = TypeVar('QueryValues', Tuple[Any, ...], Generator[Tuple[Any, ...], None, None])
 
 
-class _QueryValueHandlerMixin(object, metaclass=ABCMeta):
+class _QueryValueHandlerMixin(metaclass=ABCMeta):
 
     @abstractmethod
     def _get_values(self) -> QueryValues:
@@ -20,7 +20,7 @@ class _QueryValueHandlerMixin(object, metaclass=ABCMeta):
         return self._get_values()
 
 
-class _IQueryValueStrings(object, metaclass=ABCMeta):
+class _IQueryValueStrings(metaclass=ABCMeta):
 
     @property
     @abstractmethod

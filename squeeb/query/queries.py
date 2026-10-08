@@ -29,7 +29,7 @@ class _QueryArgs(Enum):
     WHERE = 2
 
 
-class AbstractQueryBuilder(object, metaclass=ABCMeta):
+class AbstractQueryBuilder(metaclass=ABCMeta):
     _table_name: str = None
     _value_map: _QueryValueMap | _QueryValueMapGroup = None
     _where_conditions: _IQueryCondition = None

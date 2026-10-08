@@ -14,7 +14,7 @@ def camel_to_snake_case(value: str, lowercase: bool = False, uppercase: bool = F
         return underscored
 
 
-class _IStringable(object, metaclass=ABCMeta):
+class _IStringable(metaclass=ABCMeta):
 
     @abstractmethod
     def __str__(self) -> str:
